@@ -1,3 +1,5 @@
+import { mapRegulator } from './form-data-mapper.js'
+
 /**
  * Extract repeater field data from raw form submission
  * @param {Object} rawFormSubmissionObject - The raw form submission object
@@ -21,8 +23,14 @@ export function extractRepeaters(
   const repeaterName = repeaterPage.repeat.options.name
   const repeaterData = rawFormSubmissionObject?.data?.repeaters?.[repeaterName]
 
-  if (!Array.isArray(repeaterData)) {
+  if (repeaterData == null) {
     return []
+  }
+
+  if (!Array.isArray(repeaterData)) {
+    throw new TypeError(
+      `Invalid repeater data for "${pageTitle}": expected array but got ${typeof repeaterData}`
+    )
   }
 
   const componentMap = new Map(
@@ -166,4 +174,46 @@ export function retrieveFileUploadDetails(rawFormSubmission, shortDescription) {
     defraFormUploadedFileId: file.fileId,
     defraFormUserDownloadLink: file.userDownloadLink
   }))
+}
+
+export function extractTimestamp(rawFormSubmission) {
+  const timestamp =
+    rawFormSubmission?.rawSubmissionData?.meta?.timestamp?.trim()
+
+  if (!timestamp) {
+    return undefined
+  }
+
+  const resultDate = new Date(timestamp)
+
+  if (Number.isNaN(resultDate.getTime())) {
+    return null
+  }
+
+  return resultDate
+}
+
+export function extractAgencyFromDefinitionName(rawFormSubmission) {
+  const definitionName =
+    rawFormSubmission?.rawSubmissionData?.meta?.definition?.name
+
+  if (!definitionName) {
+    return undefined
+  }
+
+  // Match pattern like "(EA)" or "(SEPA)" at the end of the name
+  const match = definitionName.match(/\(([A-Z]+)\)\s*$/)
+
+  return match ? mapRegulator(match[1]) : undefined
+}
+
+/**
+ * Find the first field that exists in answers and return its value
+ * @param {Object} answers - Object containing answer values
+ * @param {Array<string>} fieldNames - Array of field names to check
+ * @returns {*} Value of the first field that exists, or undefined
+ */
+export function findFirstValue(answers, fieldNames) {
+  const field = fieldNames.find((f) => answers?.[f])
+  return field ? answers[field] : undefined
 }

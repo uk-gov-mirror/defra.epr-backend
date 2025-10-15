@@ -1,6 +1,9 @@
 import {
-  extractRepeaters,
+  extractAgencyFromDefinitionName,
   extractAnswers,
+  extractRepeaters,
+  extractTimestamp,
+  findFirstValue,
   flattenAnswersByShortDesc,
   retrieveFileUploadDetails
 } from './parse-forms-data.js'
@@ -11,17 +14,19 @@ import exporterRegistration from '#data/fixtures/ea/registration/exporter.json' 
 import reprocessorAllMaterials from '#data/fixtures/ea/registration/reprocessor-all-materials.json' with { type: 'json' }
 import { readdirSync, readFileSync } from 'fs'
 import { join } from 'path'
+import { REGULATOR } from '#domain/organisations.js'
 
 describe('extractRepeaters', () => {
-  const partnershipPage = FORM_PAGES.ORGANISATION.PARTNERSHIP_DETAILS
+  const ltdPartnershipPage = FORM_PAGES.ORGANISATION.LTD_PARTNERSHIP_DETAILS
 
   it('should extract partner names and types from limited partnership', () => {
     const result = extractRepeaters(
       registeredLtdPartnership.rawSubmissionData,
-      partnershipPage.title,
+      ltdPartnershipPage.title,
       {
-        [partnershipPage.fields.PARTNER_NAMES]: 'name',
-        [partnershipPage.fields.PARTNER_TYPE]: 'type'
+        [FORM_PAGES.ORGANISATION.LTD_PARTNERSHIP_DETAILS.fields.PARTNER_NAMES]:
+          'name',
+        [ltdPartnershipPage.fields.PARTNER_TYPE]: 'type'
       }
     )
 
@@ -42,8 +47,8 @@ describe('extractRepeaters', () => {
       registeredLtdPartnership.rawSubmissionData,
       'Non-existent page title',
       {
-        [partnershipPage.fields.PARTNER_NAMES]: 'name',
-        [partnershipPage.fields.PARTNER_TYPE]: 'type'
+        [ltdPartnershipPage.fields.PARTNER_NAMES]: 'name',
+        [ltdPartnershipPage.fields.PARTNER_TYPE]: 'type'
       }
     )
 
@@ -51,10 +56,14 @@ describe('extractRepeaters', () => {
   })
 
   it('should return empty array when rawFormSubmissionObject is undefined', () => {
-    const result = extractRepeaters(undefined, partnershipPage.title, {
-      [partnershipPage.fields.PARTNER_NAMES]: 'name',
-      [partnershipPage.fields.PARTNER_TYPE]: 'type'
-    })
+    const result = extractRepeaters(
+      undefined,
+      ltdPartnershipPage.NAME_OF_PARTNERS,
+      {
+        [ltdPartnershipPage.fields.PARTNER_NAMES]: 'name',
+        [ltdPartnershipPage.fields.PARTNER_TYPE]: 'type'
+      }
+    )
 
     expect(result).toEqual([])
   })
@@ -70,22 +79,60 @@ describe('extractRepeaters', () => {
 
     const result = extractRepeaters(
       dataWithoutRepeaters,
-      partnershipPage.title,
+      ltdPartnershipPage.NAME_OF_PARTNERS,
       {
-        [partnershipPage.fields.PARTNER_NAMES]: 'name',
-        [partnershipPage.fields.PARTNER_TYPE]: 'type'
+        [ltdPartnershipPage.fields.PARTNER_NAMES]: 'name',
+        [ltdPartnershipPage.fields.PARTNER_TYPE]: 'type'
       }
     )
 
     expect(result).toEqual([])
   })
 
+  it('should throw error when repeater data is not an array', () => {
+    const dataWithInvalidRepeaters = {
+      ...registeredLtdPartnership.rawSubmissionData,
+      data: {
+        ...registeredLtdPartnership.rawSubmissionData.data,
+        repeaters: {
+          CZFqEV: {}
+        }
+      }
+    }
+
+    expect(() =>
+      extractRepeaters(dataWithInvalidRepeaters, ltdPartnershipPage.title, {
+        [ltdPartnershipPage.fields.PARTNER_NAMES]: 'name',
+        [ltdPartnershipPage.fields.PARTNER_TYPE]: 'type'
+      })
+    ).toThrow(
+      'Invalid repeater data for "Names of partners in your limited partnership": expected array but got object'
+    )
+  })
+
+  it('should return [] when repeater data is not not present', () => {
+    const dataWithInvalidRepeaters = {
+      ...registeredLtdPartnership.rawSubmissionData,
+      data: {
+        ...registeredLtdPartnership.rawSubmissionData.data,
+        repeaters: {}
+      }
+    }
+
+    expect(
+      extractRepeaters(dataWithInvalidRepeaters, ltdPartnershipPage.title, {
+        [ltdPartnershipPage.fields.PARTNER_NAMES]: 'name',
+        [ltdPartnershipPage.fields.PARTNER_TYPE]: 'type'
+      })
+    ).toEqual([])
+  })
+
   it('should only extract specified fields from fieldMapping', () => {
     const result = extractRepeaters(
       registeredLtdPartnership.rawSubmissionData,
-      partnershipPage.title,
+      ltdPartnershipPage.title,
       {
-        [partnershipPage.fields.PARTNER_NAMES]: 'name'
+        [ltdPartnershipPage.fields.PARTNER_NAMES]: 'name'
       }
     )
 
@@ -541,5 +588,148 @@ describe('retrieveFileUploadDetails', () => {
         defraFormUserDownloadLink: 'http://test.com/file'
       }
     ])
+  })
+})
+
+describe('extractTimestamp', () => {
+  it('should extract timestamp from raw form submission as Date object', () => {
+    const result = extractTimestamp(registeredLtdPartnership)
+
+    expect(result).toBeInstanceOf(Date)
+    expect(result.toISOString()).toBe('2025-10-08T16:14:15.390Z')
+  })
+
+  it('should return undefined when timestamp is missing', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {
+          definition: {}
+        }
+      }
+    }
+
+    expect(extractTimestamp(mockData)).toBeUndefined()
+  })
+
+  it('should return null  when timestamp is invalid', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {
+          timestamp: 'invalid-date-string'
+        }
+      }
+    }
+
+    expect(extractTimestamp(mockData)).toBeNull()
+  })
+
+  it('should parse valid ISO 8601 timestamps correctly', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {
+          timestamp: '2025-10-08T16:19:54.601Z'
+        }
+      }
+    }
+
+    const result = extractTimestamp(mockData)
+
+    expect(result).toBeInstanceOf(Date)
+    expect(result.getFullYear()).toBe(2025)
+    expect(result.getMonth()).toBe(9) // October (0-indexed)
+    expect(result.getDate()).toBe(8)
+  })
+})
+
+describe('extractAgencyFromDefinitionName', () => {
+  it('should extract EA from definition name', () => {
+    const result = extractAgencyFromDefinitionName(registeredLtdPartnership)
+
+    expect(result).toBe(REGULATOR.EA)
+  })
+
+  it('should return undefined when definition name is missing', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {}
+      }
+    }
+
+    expect(extractAgencyFromDefinitionName(mockData)).toBeUndefined()
+  })
+
+  it('should return undefined when no agency code pattern found', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {
+          definition: {
+            name: 'Demo form without agency code'
+          }
+        }
+      }
+    }
+
+    expect(extractAgencyFromDefinitionName(mockData)).toBeUndefined()
+  })
+
+  it('should extract EA from org definition name', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {
+          definition: {
+            name: 'Demo for pEPR - Extended Producer Responsibilities: provide your organisation details (EA)'
+          }
+        }
+      }
+    }
+
+    expect(extractAgencyFromDefinitionName(mockData)).toBe(REGULATOR.EA)
+  })
+
+  it('should extract NRW from accreditation form definition name', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {
+          definition: {
+            name: 'Demo for pEPR - Extended Producer Responsibilities: apply for accreditation as a packaging waste exporter (NRW)'
+          }
+        }
+      }
+    }
+
+    expect(extractAgencyFromDefinitionName(mockData)).toBe(REGULATOR.NRW)
+  })
+
+  it('should extract NIEA from registration form definition name', () => {
+    const mockData = {
+      rawSubmissionData: {
+        meta: {
+          definition: {
+            name: 'Demo for pEPR - Extended Producer Responsibilities: register as a packaging waste reprocessor (NIEA)'
+          }
+        }
+      }
+    }
+
+    expect(extractAgencyFromDefinitionName(mockData)).toBe(REGULATOR.NIEA)
+  })
+})
+
+describe('findFirstValue', () => {
+  it('should return first existing field value', () => {
+    const answers = { field2: 'value2', field3: 'value3' }
+    expect(findFirstValue(answers, ['field1', 'field2', 'field3'])).toBe(
+      'value2'
+    )
+  })
+
+  it('should return undefined when no field exists', () => {
+    const answers = { field4: 'value4' }
+    expect(findFirstValue(answers, ['field1', 'field2'])).toBeUndefined()
+  })
+
+  it('should return undefined for empty field list', () => {
+    const answers = { field1: 'value1' }
+    expect(findFirstValue(answers, [])).toBeUndefined()
   })
 })

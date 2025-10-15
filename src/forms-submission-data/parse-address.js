@@ -10,7 +10,7 @@ const THREE_MIDDLE_PARTS = 3
  */
 export function parseUkAddress(addressString) {
   if (!addressString || typeof addressString !== 'string') {
-    return { fullAddress: addressString || '' }
+    return null
   }
 
   const parts = addressString
@@ -19,14 +19,15 @@ export function parseUkAddress(addressString) {
     .filter((part) => part !== '')
 
   if (parts.length < MIN_ADDRESS_PARTS) {
-    return { fullAddress: addressString }
+    return { fullAddress: addressString, country: 'UK' }
   }
 
   const middleParts = parts.slice(1, -1)
 
   const result = {
     line1: parts.at(0),
-    postcode: parts.at(-1)
+    postcode: parts.at(-1),
+    country: 'UK'
   }
 
   if (middleParts.length === SINGLE_MIDDLE_PART) {
