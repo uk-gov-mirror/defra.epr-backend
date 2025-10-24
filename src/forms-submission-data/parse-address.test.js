@@ -14,9 +14,7 @@ describe('parseUkAddress', () => {
 
       expect(result).toEqual({
         line1: '45 High Street',
-        line2: '',
         town: 'Birmingham',
-        county: '',
         postcode: 'B2 4AA',
         country: 'UK'
       })
@@ -42,9 +40,7 @@ describe('parseUkAddress', () => {
 
       expect(result).toEqual({
         line1: '123 Main St',
-        line2: '',
         town: 'London',
-        county: '',
         postcode: 'SE1 9SG',
         country: 'UK'
       })
@@ -167,20 +163,18 @@ describe('parseUkAddress', () => {
 
       expect(result).toEqual({
         line1: '45 High Street',
-        line2: '',
         town: 'Birmingham',
-        county: '',
         postcode: 'B2 4AA',
         country: 'UK'
       })
     })
 
-    it('should return fullAddress when input is empty', () => {
-      expect(parseUkAddress('')).toBeNull()
+    it('should return undefined when input is empty', () => {
+      expect(parseUkAddress('')).toBeUndefined()
     })
 
-    it('should return fullAddress when input is null', () => {
-      expect(parseUkAddress(null)).toBeNull()
+    it('should return undefined when input is null', () => {
+      expect(parseUkAddress(null)).toBeUndefined()
     })
   })
 })

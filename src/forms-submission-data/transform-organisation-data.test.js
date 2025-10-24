@@ -18,11 +18,11 @@ import soleTraderSeparateControl from '#data/fixtures/ea/organisation/sole-trade
 import nonUkSeparateControl from '#data/fixtures/ea/organisation/non-uk-separate-control.json'
 
 describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
-  it('should parse registered limited partnership organisation from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse registered limited partnership organisation from fixture', async () => {
+    const result = await parseOrgSubmission(
       registeredLtdPartnership._id.$oid,
       registeredLtdPartnership.orgId,
-      registeredLtdPartnership
+      registeredLtdPartnership.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -63,11 +63,11 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     })
   })
 
-  it('should parse registered limited liability partnership organisation from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse registered limited liability partnership organisation from fixture', async () => {
+    const result = await parseOrgSubmission(
       registeredLtdLiability._id.$oid,
       registeredLtdLiability.orgId,
-      registeredLtdLiability
+      registeredLtdLiability.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -104,11 +104,11 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     })
   })
 
-  it('should parse registered organisation with no partnership from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse registered organisation with no partnership from fixture', async () => {
+    const result = await parseOrgSubmission(
       registeredNoPartnership._id.$oid,
       registeredNoPartnership.orgId,
-      registeredNoPartnership
+      registeredNoPartnership.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -149,11 +149,11 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     expect(result.partnership).toBeUndefined()
   })
 
-  it('should parse non-registered UK sole trader organisation from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse non-registered UK sole trader organisation from fixture', async () => {
+    const result = await parseOrgSubmission(
       nonRegisteredUkSoleTrader._id.$oid,
       nonRegisteredUkSoleTrader.orgId,
-      nonRegisteredUkSoleTrader
+      nonRegisteredUkSoleTrader.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -183,15 +183,15 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     })
 
     expect(result.companyDetails.registrationNumber).toBeUndefined()
-    expect(result.companyDetails.registeredAddress).toBeNull()
+    expect(result.companyDetails.registeredAddress).toBeUndefined()
     expect(result.partnership).toBeUndefined()
   })
 
-  it('should parse non-registered organisation with outside UK address from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse non-registered organisation with outside UK address from fixture', async () => {
+    const result = await parseOrgSubmission(
       nonRegisteredOutsideUk._id.$oid,
       nonRegisteredOutsideUk.orgId,
-      nonRegisteredOutsideUk
+      nonRegisteredOutsideUk.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -225,15 +225,15 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     })
 
     expect(result.companyDetails.registrationNumber).toBeUndefined()
-    expect(result.companyDetails.registeredAddress).toBeNull()
+    expect(result.companyDetails.registeredAddress).toBeUndefined()
     expect(result.partnership).toBeUndefined()
   })
 
-  it('should parse unincorporated association with separate management contact from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse unincorporated association with separate management contact from fixture', async () => {
+    const result = await parseOrgSubmission(
       unincorporatedSeparateControl._id.$oid,
       unincorporatedSeparateControl.orgId,
-      unincorporatedSeparateControl
+      unincorporatedSeparateControl.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -268,15 +268,15 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     })
 
     expect(result.companyDetails.registrationNumber).toBeUndefined()
-    expect(result.companyDetails.registeredAddress).toBeNull()
+    expect(result.companyDetails.registeredAddress).toBeUndefined()
     expect(result.partnership).toBeUndefined()
   })
 
-  it('should parse sole trader with separate management contact from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse sole trader with separate management contact from fixture', async () => {
+    const result = await parseOrgSubmission(
       soleTraderSeparateControl._id.$oid,
       soleTraderSeparateControl.orgId,
-      soleTraderSeparateControl
+      soleTraderSeparateControl.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -310,15 +310,15 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     })
 
     expect(result.companyDetails.registrationNumber).toBeUndefined()
-    expect(result.companyDetails.registeredAddress).toBeNull()
+    expect(result.companyDetails.registeredAddress).toBeUndefined()
     expect(result.partnership).toBeUndefined()
   })
 
-  it('should parse non-UK organisation with separate management contact from fixture', () => {
-    const result = parseOrgSubmission(
+  it('should parse non-UK organisation with separate management contact from fixture', async () => {
+    const result = await parseOrgSubmission(
       nonUkSeparateControl._id.$oid,
       nonUkSeparateControl.orgId,
-      nonUkSeparateControl
+      nonUkSeparateControl.rawSubmissionData
     )
 
     expect(result).toMatchObject({
@@ -355,13 +355,13 @@ describe('parseOrgSubmission - Integration Tests with Fixture Data', () => {
     })
 
     expect(result.companyDetails.registrationNumber).toBeUndefined()
-    expect(result.companyDetails.registeredAddress).toBeNull()
+    expect(result.companyDetails.registeredAddress).toBeUndefined()
     expect(result.partnership).toBeUndefined()
   })
 })
 
 describe('parseOrgSubmission - Error Cases', () => {
-  it('should throw error when waste processing type field is missing', () => {
+  it('should throw error when waste processing type field is missing', async () => {
     const invalidSubmission = {
       ...registeredNoPartnership,
       answers: registeredNoPartnership.answers.filter(
@@ -380,12 +380,14 @@ describe('parseOrgSubmission - Error Cases', () => {
       }
     }
 
-    expect(() =>
+    await expect(
       parseOrgSubmission(
         invalidSubmission._id.$oid,
         invalidSubmission.orgId,
-        invalidSubmission
+        invalidSubmission.rawSubmissionData
       )
-    ).toThrow('Waste processing type field "Currently operational?" not found')
+    ).rejects.toThrow(
+      'Waste processing type field "Currently operational?" not found'
+    )
   })
 })

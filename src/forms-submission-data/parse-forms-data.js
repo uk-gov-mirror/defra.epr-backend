@@ -52,16 +52,22 @@ export function extractRepeaters(
 
 /**
  * Extract all non-repeatable answers from form submission
- * @param {Object} rawFormSubmission - The raw form submission object
+ * @param {Object} rawSubmissionData - The raw submission data object
  * @returns {Object} Nested object grouped by page title with shortDescription as keys
  * @throws {Error} If required fields are missing, duplicate page title or shortDescription are detected within the same page
  */
-export function extractAnswers(rawFormSubmission) {
-  const pages = rawFormSubmission?.rawSubmissionData?.meta?.definition?.pages
-  const mainData = rawFormSubmission?.rawSubmissionData?.data?.main
+export function extractAnswers(rawSubmissionData) {
+  const pages = rawSubmissionData?.meta?.definition?.pages
+  const mainData = rawSubmissionData?.data?.main
 
-  if (!pages || !Array.isArray(pages)) {
-    throw new Error('extractAnswers: Missing or invalid pages definition')
+  if (!pages) {
+    throw new Error('extractAnswers: Missing pages definition')
+  }
+
+  if (!Array.isArray(pages)) {
+    throw new TypeError(
+      `extractAnswers: pages must be an array, got ${typeof pages}`
+    )
   }
 
   if (!mainData) {
@@ -143,13 +149,13 @@ export function flattenAnswersByShortDesc(answers) {
 
 /**
  * Retrieve file upload details by shortDescription
- * @param {Object} rawFormSubmission - The raw form submission object
+ * @param {Object} rawSubmissionData - The raw submission data object
  * @param {string} shortDescription - The shortDescription of the file upload field
  * @returns {Array<Object>} Array of file upload details with transformed keys
  */
-export function retrieveFileUploadDetails(rawFormSubmission, shortDescription) {
-  const pages = rawFormSubmission?.rawSubmissionData?.meta?.definition?.pages
-  const files = rawFormSubmission?.rawSubmissionData?.data?.files
+export function retrieveFileUploadDetails(rawSubmissionData, shortDescription) {
+  const pages = rawSubmissionData?.meta?.definition?.pages
+  const files = rawSubmissionData?.data?.files
 
   const component = pages
     ?.flatMap((page) => page.components || [])
@@ -176,9 +182,8 @@ export function retrieveFileUploadDetails(rawFormSubmission, shortDescription) {
   }))
 }
 
-export function extractTimestamp(rawFormSubmission) {
-  const timestamp =
-    rawFormSubmission?.rawSubmissionData?.meta?.timestamp?.trim()
+export function extractTimestamp(rawSubmissionData) {
+  const timestamp = rawSubmissionData?.meta?.timestamp?.trim()
 
   if (!timestamp) {
     return undefined
@@ -193,9 +198,8 @@ export function extractTimestamp(rawFormSubmission) {
   return resultDate
 }
 
-export function extractAgencyFromDefinitionName(rawFormSubmission) {
-  const definitionName =
-    rawFormSubmission?.rawSubmissionData?.meta?.definition?.name
+export function extractAgencyFromDefinitionName(rawSubmissionData) {
+  const definitionName = rawSubmissionData?.meta?.definition?.name
 
   if (!definitionName) {
     return undefined

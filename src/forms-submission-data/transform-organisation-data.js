@@ -130,41 +130,36 @@ function getManagementContactDetails(answersByShortDescription) {
     IS_SEPARATE_CONTACT_SOLE_TRADER
   } = FORM_PAGES.ORGANISATION.MANAGEMENT_CONTACT_DETAILS
 
-  const managementDifferentThanSubmitter = findFirstValue(
-    answersByShortDescription,
-    [
-      IS_SEPARATE_CONTACT_NON_UK,
-      IS_SEPARATE_CONTACT_UNINCORP,
-      IS_SEPARATE_CONTACT_SOLE_TRADER
-    ]
-  )
+  const submitterControlOrg = findFirstValue(answersByShortDescription, [
+    IS_SEPARATE_CONTACT_NON_UK,
+    IS_SEPARATE_CONTACT_UNINCORP,
+    IS_SEPARATE_CONTACT_SOLE_TRADER
+  ])
 
-  if (managementDifferentThanSubmitter !== 'false') {
-    return undefined
-  }
-
-  return {
-    fullName: findFirstValue(answersByShortDescription, [
-      fields.NON_UK_NAME,
-      fields.UNINCORP_NAME,
-      fields.SOLE_TRADER_NAME
-    ]),
-    email: findFirstValue(answersByShortDescription, [
-      fields.NON_UK_EMAIL,
-      fields.UNINCORP_EMAIL,
-      fields.SOLE_TRADER_EMAIL
-    ]),
-    phone: findFirstValue(answersByShortDescription, [
-      fields.NON_UK_PHONE,
-      fields.UNINCORP_PHONE,
-      fields.SOLE_TRADER_PHONE
-    ]),
-    title: findFirstValue(answersByShortDescription, [
-      fields.NON_UK_JOB_TITLE,
-      fields.UNINCORP_JOB_TITLE,
-      fields.SOLE_TRADER_JOB_TITLE
-    ])
-  }
+  return submitterControlOrg === 'false'
+    ? {
+        fullName: findFirstValue(answersByShortDescription, [
+          fields.NON_UK_NAME,
+          fields.UNINCORP_NAME,
+          fields.SOLE_TRADER_NAME
+        ]),
+        email: findFirstValue(answersByShortDescription, [
+          fields.NON_UK_EMAIL,
+          fields.UNINCORP_EMAIL,
+          fields.SOLE_TRADER_EMAIL
+        ]),
+        phone: findFirstValue(answersByShortDescription, [
+          fields.NON_UK_PHONE,
+          fields.UNINCORP_PHONE,
+          fields.SOLE_TRADER_PHONE
+        ]),
+        title: findFirstValue(answersByShortDescription, [
+          fields.NON_UK_JOB_TITLE,
+          fields.UNINCORP_JOB_TITLE,
+          fields.SOLE_TRADER_JOB_TITLE
+        ])
+      }
+    : undefined
 }
 
 function getPartnershipDetails(answersByShortDescription, rawSubmissionData) {
@@ -175,7 +170,7 @@ function getPartnershipDetails(answersByShortDescription, rawSubmissionData) {
   )
 
   const generalPartners = extractRepeaters(
-    rawSubmissionData.rawSubmissionData,
+    rawSubmissionData,
     FORM_PAGES.ORGANISATION.PARTNERSHIP_DETAILS.title,
     {
       [FORM_PAGES.ORGANISATION.PARTNERSHIP_DETAILS.fields.PARTNER_NAME]: 'name',
@@ -187,7 +182,7 @@ function getPartnershipDetails(answersByShortDescription, rawSubmissionData) {
   const ltdPartnershipPage = FORM_PAGES.ORGANISATION.LTD_PARTNERSHIP_DETAILS
 
   const ltdPartners = extractRepeaters(
-    rawSubmissionData.rawSubmissionData,
+    rawSubmissionData,
     ltdPartnershipPage.title,
     {
       [FORM_PAGES.ORGANISATION.LTD_PARTNERSHIP_DETAILS.fields.PARTNER_NAMES]:
@@ -209,7 +204,7 @@ function getPartnershipDetails(answersByShortDescription, rawSubmissionData) {
       }
 }
 
-export function parseOrgSubmission(id, orgId, rawSubmissionData) {
+export async function parseOrgSubmission(id, orgId, rawSubmissionData) {
   const answersByPages = extractAnswers(rawSubmissionData)
   const answersByShortDescription = flattenAnswersByShortDesc(answersByPages)
   return {

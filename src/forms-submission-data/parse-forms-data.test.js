@@ -173,7 +173,7 @@ describe('extractRepeaters', () => {
 
 describe('extractAnswers', () => {
   it('should extract answers in nested structure by page', () => {
-    const result = extractAnswers(exporterRegistration)
+    const result = extractAnswers(exporterRegistration.rawSubmissionData)
     const orgDetails = FORM_PAGES.REPROCESSOR_REGISTRATION.ORGANISATION_DETAILS
 
     const haveOrgId = FORM_PAGES.REPROCESSOR_REGISTRATION.HAVE_ORGANISATION_ID
@@ -193,7 +193,7 @@ describe('extractAnswers', () => {
   })
 
   it('should handle duplicate field names across different pages', () => {
-    const result = extractAnswers(reprocessorAllMaterials)
+    const result = extractAnswers(reprocessorAllMaterials.rawSubmissionData)
     const envPermit =
       FORM_PAGES.REPROCESSOR_REGISTRATION.ALUMINIUM_ENVIRONMENTAL_PERMIT
     const siteCapacity =
@@ -210,17 +210,15 @@ describe('extractAnswers', () => {
 
   it('should throw error when rawFormSubmission is undefined', () => {
     expect(() => extractAnswers(undefined)).toThrow(
-      'extractAnswers: Missing or invalid pages definition'
+      'extractAnswers: Missing pages definition'
     )
   })
 
   it('should throw error when data.main is missing', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            pages: []
-          }
+      meta: {
+        definition: {
+          pages: []
         }
       }
     }
@@ -229,41 +227,70 @@ describe('extractAnswers', () => {
     )
   })
 
+  it('should throw error when rawSubmissionData is null', () => {
+    expect(() => extractAnswers(null)).toThrow(
+      'extractAnswers: Missing pages definition'
+    )
+  })
+
+  it('should throw error when meta.definition is null', () => {
+    const mockData = {
+      meta: {
+        definition: null
+      }
+    }
+    expect(() => extractAnswers(mockData)).toThrow(
+      'extractAnswers: Missing pages definition'
+    )
+  })
+
+  it('should throw error when data is null', () => {
+    const mockData = {
+      meta: {
+        definition: {
+          pages: []
+        }
+      },
+      data: null
+    }
+    expect(() => extractAnswers(mockData)).toThrow(
+      'extractAnswers: Missing or invalid data.main'
+    )
+  })
+
   it('should skip components without shortDescription or name', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            pages: [
-              {
-                title: 'Test Page',
-                components: [
-                  {
-                    type: 'TextField',
-                    title: 'Question without shortDescription',
-                    name: 'skipMe1'
-                  },
-                  // Valid component (should be included)
-                  {
-                    type: 'TextField',
-                    shortDescription: 'Valid field',
-                    name: 'validField'
-                  },
-                  // Component without name (should be skipped)
-                  {
-                    shortDescription: 'Field without name',
-                    title: 'Another question'
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        data: {
-          main: {
-            skipMe1: 'Should be skipped',
-            validField: 'Test value'
-          }
+      meta: {
+        definition: {
+          pages: [
+            {
+              title: 'Test Page',
+              components: [
+                {
+                  type: 'TextField',
+                  title: 'Question without shortDescription',
+                  name: 'skipMe1'
+                },
+                // Valid component (should be included)
+                {
+                  type: 'TextField',
+                  shortDescription: 'Valid field',
+                  name: 'validField'
+                },
+                // Component without name (should be skipped)
+                {
+                  shortDescription: 'Field without name',
+                  title: 'Another question'
+                }
+              ]
+            }
+          ]
+        }
+      },
+      data: {
+        main: {
+          skipMe1: 'Should be skipped',
+          validField: 'Test value'
         }
       }
     }
@@ -279,25 +306,23 @@ describe('extractAnswers', () => {
 
   it('should handle pages without components property', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            pages: [
-              {
-                title: 'Empty Page'
-                // No components property
-              },
-              {
-                title: 'Page with Data',
-                components: [{ shortDescription: 'Field 1', name: 'field1' }]
-              }
-            ]
-          }
-        },
-        data: {
-          main: {
-            field1: 'value1'
-          }
+      meta: {
+        definition: {
+          pages: [
+            {
+              title: 'Empty Page'
+              // No components property
+            },
+            {
+              title: 'Page with Data',
+              components: [{ shortDescription: 'Field 1', name: 'field1' }]
+            }
+          ]
+        }
+      },
+      data: {
+        main: {
+          field1: 'value1'
         }
       }
     }
@@ -314,41 +339,57 @@ describe('extractAnswers', () => {
 
   it('should throw error when pages definition is missing', () => {
     const mockData = {
-      rawSubmissionData: {
-        data: {
-          main: {
-            abc123: 'test value'
-          }
+      data: {
+        main: {
+          abc123: 'test value'
         }
       }
     }
 
     expect(() => extractAnswers(mockData)).toThrow(
-      'extractAnswers: Missing or invalid pages definition'
+      'extractAnswers: Missing pages definition'
+    )
+  })
+
+  it('should throw TypeError when pages is not an array', () => {
+    const mockData = {
+      meta: {
+        definition: {
+          pages: { invalidType: 'should be array' }
+        }
+      },
+      data: {
+        main: {
+          field1: 'value1'
+        }
+      }
+    }
+
+    expect(() => extractAnswers(mockData)).toThrow(TypeError)
+    expect(() => extractAnswers(mockData)).toThrow(
+      'extractAnswers: pages must be an array, got object'
     )
   })
 
   it('should throw error for duplicate fields within the same page', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            pages: [
-              {
-                title: 'Organisation details',
-                components: [
-                  { shortDescription: 'Org name', name: 'field1' },
-                  { shortDescription: 'Org name', name: 'field2' }
-                ]
-              }
-            ]
-          }
-        },
-        data: {
-          main: {
-            field1: 'Company A',
-            field2: 'Company B'
-          }
+      meta: {
+        definition: {
+          pages: [
+            {
+              title: 'Organisation details',
+              components: [
+                { shortDescription: 'Org name', name: 'field1' },
+                { shortDescription: 'Org name', name: 'field2' }
+              ]
+            }
+          ]
+        }
+      },
+      data: {
+        main: {
+          field1: 'Company A',
+          field2: 'Company B'
         }
       }
     }
@@ -360,28 +401,24 @@ describe('extractAnswers', () => {
 
   it('should throw error for duplicate page titles', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            pages: [
-              {
-                title: 'Organisation details',
-                components: [{ shortDescription: 'Org name', name: 'field1' }]
-              },
-              {
-                title: 'Organisation details',
-                components: [
-                  { shortDescription: 'Contact name', name: 'field2' }
-                ]
-              }
-            ]
-          }
-        },
-        data: {
-          main: {
-            field1: 'Company A',
-            field2: 'John Doe'
-          }
+      meta: {
+        definition: {
+          pages: [
+            {
+              title: 'Organisation details',
+              components: [{ shortDescription: 'Org name', name: 'field1' }]
+            },
+            {
+              title: 'Organisation details',
+              components: [{ shortDescription: 'Contact name', name: 'field2' }]
+            }
+          ]
+        }
+      },
+      data: {
+        main: {
+          field1: 'Company A',
+          field2: 'John Doe'
         }
       }
     }
@@ -436,7 +473,7 @@ describe('flattenAnswersByShortDesc', () => {
   })
 
   it('should work with real fixture data', () => {
-    const answers = extractAnswers(exporterRegistration)
+    const answers = extractAnswers(exporterRegistration.rawSubmissionData)
     const flattened = flattenAnswersByShortDesc(answers)
 
     const orgDetails = FORM_PAGES.REPROCESSOR_REGISTRATION.ORGANISATION_DETAILS
@@ -473,7 +510,7 @@ describe('extractAnswers - validate all EA fixtures for duplicates', () => {
       const data = JSON.parse(content)
 
       // Should extract answers without duplicate page titles or shortDescriptions within same page
-      const answers = extractAnswers(data)
+      const answers = extractAnswers(data.rawSubmissionData)
       expect(answers).toBeDefined()
 
       // Should flatten answers without unexpected duplicate shortDescriptions
@@ -486,7 +523,7 @@ describe('extractAnswers - validate all EA fixtures for duplicates', () => {
 describe('retrieveFileUploadDetails', () => {
   it('should retrieve file upload details', () => {
     const result = retrieveFileUploadDetails(
-      exporterRegistration,
+      exporterRegistration.rawSubmissionData,
       'Sampling and inspection plan'
     )
 
@@ -500,7 +537,7 @@ describe('retrieveFileUploadDetails', () => {
 
   it('should retrieve file with ORS Log shortDescription', () => {
     const result = retrieveFileUploadDetails(
-      exporterRegistration,
+      exporterRegistration.rawSubmissionData,
       'Overseas reprocessing and interim sites'
     )
 
@@ -513,12 +550,10 @@ describe('retrieveFileUploadDetails', () => {
 
   it('should throw error when FileUploadField exists but has no files', () => {
     const dataWithoutFiles = {
-      rawSubmissionData: {
-        ...exporterRegistration.rawSubmissionData,
-        data: {
-          ...exporterRegistration.rawSubmissionData.data,
-          files: {}
-        }
+      ...exporterRegistration.rawSubmissionData,
+      data: {
+        ...exporterRegistration.rawSubmissionData.data,
+        files: {}
       }
     }
 
@@ -532,7 +567,10 @@ describe('retrieveFileUploadDetails', () => {
 
   it('should throw error when file upload field not found', () => {
     expect(() =>
-      retrieveFileUploadDetails(exporterRegistration, 'Non-existent field')
+      retrieveFileUploadDetails(
+        exporterRegistration.rawSubmissionData,
+        'Non-existent field'
+      )
     ).toThrow(
       'File upload field not found for shortDescription: Non-existent field'
     )
@@ -540,42 +578,43 @@ describe('retrieveFileUploadDetails', () => {
 
   it('should throw error when shortDescription matches TextField not FileUploadField', () => {
     expect(() =>
-      retrieveFileUploadDetails(exporterRegistration, 'Org name')
+      retrieveFileUploadDetails(
+        exporterRegistration.rawSubmissionData,
+        'Org name'
+      )
     ).toThrow('File upload field not found for shortDescription: Org name')
   })
 
   it('should handle pages without components property when searching for file', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            pages: [
-              {
-                title: 'Empty Page'
-                // No components property
-              },
-              {
-                title: 'File Upload Page',
-                components: [
-                  {
-                    type: 'FileUploadField',
-                    shortDescription: 'Test file',
-                    name: 'testFile'
-                  }
-                ]
-              }
-            ]
-          }
-        },
-        data: {
-          files: {
-            testFile: [
-              {
-                fileId: 'test-id',
-                userDownloadLink: 'http://test.com/file'
-              }
-            ]
-          }
+      meta: {
+        definition: {
+          pages: [
+            {
+              title: 'Empty Page'
+              // No components property
+            },
+            {
+              title: 'File Upload Page',
+              components: [
+                {
+                  type: 'FileUploadField',
+                  shortDescription: 'Test file',
+                  name: 'testFile'
+                }
+              ]
+            }
+          ]
+        }
+      },
+      data: {
+        files: {
+          testFile: [
+            {
+              fileId: 'test-id',
+              userDownloadLink: 'http://test.com/file'
+            }
+          ]
         }
       }
     }
@@ -593,7 +632,7 @@ describe('retrieveFileUploadDetails', () => {
 
 describe('extractTimestamp', () => {
   it('should extract timestamp from raw form submission as Date object', () => {
-    const result = extractTimestamp(registeredLtdPartnership)
+    const result = extractTimestamp(registeredLtdPartnership.rawSubmissionData)
 
     expect(result).toBeInstanceOf(Date)
     expect(result.toISOString()).toBe('2025-10-08T16:14:15.390Z')
@@ -601,10 +640,8 @@ describe('extractTimestamp', () => {
 
   it('should return undefined when timestamp is missing', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {}
-        }
+      meta: {
+        definition: {}
       }
     }
 
@@ -613,10 +650,8 @@ describe('extractTimestamp', () => {
 
   it('should return null  when timestamp is invalid', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          timestamp: 'invalid-date-string'
-        }
+      meta: {
+        timestamp: 'invalid-date-string'
       }
     }
 
@@ -625,10 +660,8 @@ describe('extractTimestamp', () => {
 
   it('should parse valid ISO 8601 timestamps correctly', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          timestamp: '2025-10-08T16:19:54.601Z'
-        }
+      meta: {
+        timestamp: '2025-10-08T16:19:54.601Z'
       }
     }
 
@@ -643,16 +676,16 @@ describe('extractTimestamp', () => {
 
 describe('extractAgencyFromDefinitionName', () => {
   it('should extract EA from definition name', () => {
-    const result = extractAgencyFromDefinitionName(registeredLtdPartnership)
+    const result = extractAgencyFromDefinitionName(
+      registeredLtdPartnership.rawSubmissionData
+    )
 
     expect(result).toBe(REGULATOR.EA)
   })
 
   it('should return undefined when definition name is missing', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {}
-      }
+      meta: {}
     }
 
     expect(extractAgencyFromDefinitionName(mockData)).toBeUndefined()
@@ -660,11 +693,9 @@ describe('extractAgencyFromDefinitionName', () => {
 
   it('should return undefined when no agency code pattern found', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            name: 'Demo form without agency code'
-          }
+      meta: {
+        definition: {
+          name: 'Demo form without agency code'
         }
       }
     }
@@ -674,11 +705,9 @@ describe('extractAgencyFromDefinitionName', () => {
 
   it('should extract EA from org definition name', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            name: 'Demo for pEPR - Extended Producer Responsibilities: provide your organisation details (EA)'
-          }
+      meta: {
+        definition: {
+          name: 'Demo for pEPR - Extended Producer Responsibilities: provide your organisation details (EA)'
         }
       }
     }
@@ -688,11 +717,9 @@ describe('extractAgencyFromDefinitionName', () => {
 
   it('should extract NRW from accreditation form definition name', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            name: 'Demo for pEPR - Extended Producer Responsibilities: apply for accreditation as a packaging waste exporter (NRW)'
-          }
+      meta: {
+        definition: {
+          name: 'Demo for pEPR - Extended Producer Responsibilities: apply for accreditation as a packaging waste exporter (NRW)'
         }
       }
     }
@@ -702,11 +729,9 @@ describe('extractAgencyFromDefinitionName', () => {
 
   it('should extract NIEA from registration form definition name', () => {
     const mockData = {
-      rawSubmissionData: {
-        meta: {
-          definition: {
-            name: 'Demo for pEPR - Extended Producer Responsibilities: register as a packaging waste reprocessor (NIEA)'
-          }
+      meta: {
+        definition: {
+          name: 'Demo for pEPR - Extended Producer Responsibilities: register as a packaging waste reprocessor (NIEA)'
         }
       }
     }

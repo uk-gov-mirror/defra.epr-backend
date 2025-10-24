@@ -37,8 +37,7 @@ const addressSchema = Joi.object({
   country: Joi.string().optional(),
   postcode: Joi.string().optional(),
   region: Joi.string().optional(),
-  fullAddress: Joi.string().optional(),
-  line2ToCounty: Joi.string().optional()
+  fullAddress: Joi.string().optional()
 })
 
 const userSchema = Joi.object({
