@@ -244,6 +244,9 @@ const registrationSchema = Joi.object({
       STATUS.ARCHIVED
     )
     .forbidden(),
+  registrationNumber: Joi.string().optional(),
+  validFrom: Joi.date().optional(),
+  validTo: Joi.date().optional(),
   formSubmissionTime: Joi.date().required(),
   submittedToRegulator: Joi.string()
     .valid(REGULATOR.EA, REGULATOR.NRW, REGULATOR.SEPA, REGULATOR.NIEA)
@@ -292,7 +295,7 @@ const registrationSchema = Joi.object({
 
 const accreditationSchema = Joi.object({
   id: idSchema,
-  accreditationNumber: Joi.number().optional(),
+  accreditationNumber: Joi.string().optional(),
   status: Joi.string()
     .valid(
       STATUS.CREATED,
@@ -302,6 +305,8 @@ const accreditationSchema = Joi.object({
       STATUS.ARCHIVED
     )
     .forbidden(),
+  validFrom: Joi.date().optional(),
+  validTo: Joi.date().optional(),
   formSubmissionTime: Joi.date().required(),
   submittedToRegulator: Joi.string()
     .valid(REGULATOR.EA, REGULATOR.NRW, REGULATOR.SEPA, REGULATOR.NIEA)
