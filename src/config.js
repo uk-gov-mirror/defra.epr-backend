@@ -204,6 +204,35 @@ const baseConfig = {
       }
     }
   },
+  oidc: {
+    defraId: {
+      configurationUrl: {
+        doc: 'DEFRA ID OIDC Configuration URL',
+        format: String,
+        env: 'DEFRA_ID_OIDC_CONFIGURATION_URL',
+        default: ''
+      },
+      serviceId: {
+        doc: 'DEFRA ID Service ID',
+        format: String,
+        env: 'DEFRA_ID_SERVICE_ID',
+        default: ''
+      },
+      clientId: {
+        doc: 'DEFRA ID Client ID',
+        format: String,
+        env: 'DEFRA_ID_CLIENT_ID',
+        default: ''
+      },
+      clientSecret: {
+        doc: 'DEFRA ID Client Secret',
+        format: String,
+        sensitive: true,
+        env: 'DEFRA_ID_CLIENT_SECRET',
+        default: ''
+      }
+    }
+  },
   featureFlags: {
     summaryLogs: {
       doc: 'Feature Flag: Summary Logs',

@@ -2,6 +2,7 @@ export const STATUS = {
   CREATED: 'created',
   APPROVED: 'approved',
   REJECTED: 'rejected',
+  ACTIVE: 'active',
   SUSPENDED: 'suspended',
   ARCHIVED: 'archived'
 }

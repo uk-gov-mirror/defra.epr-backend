@@ -55,6 +55,7 @@ export const statusHistoryItemSchema = Joi.object({
       STATUS.CREATED,
       STATUS.APPROVED,
       STATUS.REJECTED,
+      STATUS.ACTIVE,
       STATUS.SUSPENDED,
       STATUS.ARCHIVED
     )
@@ -239,6 +240,7 @@ const registrationSchema = Joi.object({
       STATUS.CREATED,
       STATUS.APPROVED,
       STATUS.REJECTED,
+      STATUS.ACTIVE,
       STATUS.SUSPENDED,
       STATUS.ARCHIVED
     )
@@ -297,6 +299,7 @@ const accreditationSchema = Joi.object({
       STATUS.CREATED,
       STATUS.APPROVED,
       STATUS.REJECTED,
+      STATUS.ACTIVE,
       STATUS.SUSPENDED,
       STATUS.ARCHIVED
     )
@@ -349,6 +352,7 @@ export const organisationInsertSchema = Joi.object({
       STATUS.CREATED,
       STATUS.APPROVED,
       STATUS.REJECTED,
+      STATUS.ACTIVE,
       STATUS.SUSPENDED,
       STATUS.ARCHIVED
     )

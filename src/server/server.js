@@ -3,6 +3,7 @@ import Hapi from '@hapi/hapi'
 import { secureContext } from '@defra/hapi-secure-context'
 
 import { getConfig } from '../config.js'
+import { auth } from '#plugins/auth.js'
 import { cacheControl } from '#plugins/cache-control.js'
 import { router } from '#plugins/router.js'
 import { workers } from '#plugins/workers.js'
@@ -62,6 +63,7 @@ async function createServer(options = {}) {
     cacheControl,
     secureContext,
     pulse,
+    auth,
     {
       plugin: mongoDbPlugin,
       options: config.get('mongo')

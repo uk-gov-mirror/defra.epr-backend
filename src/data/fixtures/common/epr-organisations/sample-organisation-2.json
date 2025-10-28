@@ -1,11 +1,12 @@
 {
   "id": "6507f1f77bcf86cd79943921",
-  "orgId": 50004,
+  "orgId": 500004,
+  "defraIdOrgId": "00000000-0000-0000-0000-000000000000",
   "schemaVersion": 1,
   "version": 1,
   "statusHistory": [
     {
-      "status": "created",
+      "status": "approved",
       "updatedAt": "2025-10-01T08:30:00.000Z"
     }
   ],
@@ -14,6 +15,11 @@
   "businessType": "individual",
   "submittedToRegulator": "nrw",
   "formSubmissionTime": "2025-10-01T08:30:00.000Z",
+  "adminEmails": [
+    "carol.white@export.com",
+    "alice.foo@export.com",
+    "dave.green@export.com"
+  ],
   "submitterContactDetails": {
     "fullName": "Carol White",
     "email": "carol.white@export.com",
@@ -23,9 +29,11 @@
   "registrations": [
     {
       "id": "6507f1f77bcf86cd79943922",
+      "registrationNumber": "R26ER2375628628-PL",
+      "accreditationId": "68f6a147c117aec8a1ab7499",
       "statusHistory": [
         {
-          "status": "created",
+          "status": "approved",
           "updatedAt": "2025-10-01T08:00:00.000Z"
         }
       ],
@@ -54,6 +62,12 @@
           "email": "carol.white@export.com",
           "title": "Owner",
           "phone": "2223334444"
+        },
+        {
+          "fullName": "Alice Foo",
+          "email": "alice.foo@export.com",
+          "title": "Owner",
+          "phone": "2223334444"
         }
       ],
       "noticeAddress": {
@@ -66,10 +80,11 @@
   "accreditations": [
     {
       "id": "68f6a147c117aec8a1ab7499",
+      "accreditationNumber": "A26ER2375628628-PL",
       "formSubmissionTime": "2025-10-01T09:00:00.000Z",
       "statusHistory": [
         {
-          "status": "created",
+          "status": "approved",
           "updatedAt": "2025-10-01T09:00:00.000Z"
         }
       ],
