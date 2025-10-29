@@ -13,7 +13,7 @@ import {
   WASTE_PERMIT_TYPE,
   RECYCLING_PROCESS,
   TONNAGE_BAND
-} from '#domain/organisations.js'
+} from '#domain/organisations/status.js'
 export const idSchema = Joi.string()
   .required()
   .custom((value, helpers) => {
@@ -41,7 +41,7 @@ const addressSchema = Joi.object({
   line2ToCounty: Joi.string().optional()
 })
 
-const userSchema = Joi.object({
+export const userSchema = Joi.object({
   fullName: Joi.string().required(),
   email: Joi.string().email().required(),
   phone: Joi.string().required(),
@@ -64,7 +64,7 @@ export const statusHistoryItemSchema = Joi.object({
   updatedBy: idSchema.optional()
 })
 
-const companyDetailsSchema = Joi.object({
+export const companyDetailsSchema = Joi.object({
   name: Joi.string().required(),
   tradingName: Joi.string().optional(),
   registrationNumber: Joi.string()
@@ -235,6 +235,7 @@ const formFileUploadSchema = Joi.object({
 
 const registrationSchema = Joi.object({
   id: idSchema,
+  registrationNumber: Joi.string().optional(),
   status: Joi.string()
     .valid(
       STATUS.CREATED,
@@ -293,7 +294,7 @@ const registrationSchema = Joi.object({
 
 const accreditationSchema = Joi.object({
   id: idSchema,
-  accreditationNumber: Joi.number().optional(),
+  accreditationNumber: Joi.string().optional(),
   status: Joi.string()
     .valid(
       STATUS.CREATED,
@@ -345,6 +346,9 @@ const accreditationUpdateSchema = accreditationSchema.fork(
 )
 
 export const organisationInsertSchema = Joi.object({
+  allowedUsers: Joi.array()
+    .items(userSchema.fork('phone', (schema) => schema.optional()))
+    .optional(),
   id: idSchema,
   orgId: Joi.number().required(),
   status: Joi.string()

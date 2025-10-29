@@ -1,5 +1,7 @@
 import {
+  validateEmail,
   validateId,
+  validateCompanyName,
   validateOrganisationInsert,
   validateOrganisationUpdate
 } from './validation.js'
@@ -12,6 +14,7 @@ import {
 } from './helpers.js'
 import Boom from '@hapi/boom'
 import { ObjectId } from 'mongodb'
+import { getAllowedUsers } from '#domain/organisations/get-allowed-users.js'
 
 const COLLECTION_NAME = 'epr-organisations'
 const MONGODB_DUPLICATE_KEY_ERROR_CODE = 11000
@@ -47,15 +50,20 @@ const performInsert = async (db, organisation) => {
       statusHistory: createInitialStatusHistory()
     })) || []
 
+  const data = {
+    _id: ObjectId.createFromHexString(id),
+    version: 1,
+    schemaVersion: SCHEMA_VERSION,
+    statusHistory: createInitialStatusHistory(),
+    ...orgFields,
+    registrations,
+    accreditations
+  }
+
   try {
     await db.collection(COLLECTION_NAME).insertOne({
-      _id: ObjectId.createFromHexString(id),
-      version: 1,
-      schemaVersion: SCHEMA_VERSION,
-      statusHistory: createInitialStatusHistory(),
-      ...orgFields,
-      registrations,
-      accreditations
+      ...data,
+      allowedUsers: getAllowedUsers(data)
     })
   } catch (error) {
     if (error.code === MONGODB_DUPLICATE_KEY_ERROR_CODE) {
@@ -91,15 +99,20 @@ const performUpdate = async (db, id, version, updates) => {
     validatedUpdates.accreditations
   )
 
+  const data = {
+    ...merged,
+    statusHistory: statusHistoryWithChanges(validatedUpdates, existing),
+    registrations,
+    accreditations,
+    version: existing.version + 1
+  }
+
   const result = await db.collection(COLLECTION_NAME).updateOne(
     { _id: ObjectId.createFromHexString(validatedId), version },
     {
       $set: {
-        ...merged,
-        statusHistory: statusHistoryWithChanges(validatedUpdates, existing),
-        registrations,
-        accreditations,
-        version: existing.version + 1
+        ...data,
+        allowedUsers: getAllowedUsers(data)
       }
     }
   )
@@ -131,6 +144,53 @@ const performFindById = async (db, id) => {
   return mapDocumentWithCurrentStatuses(doc)
 }
 
+const performFindAllByAssociatedEmail = async (db, email) => {
+  // validate the name and throw early
+  let validatedEmail
+  try {
+    validatedEmail = validateEmail(email)
+  } catch (error) {
+    throw Boom.notFound(`Organisation with provided email not found`)
+  }
+
+  const docs = await db
+    .collection(COLLECTION_NAME)
+    .find({
+      $or: [
+        { 'registrations.approvedPersons.email': validatedEmail },
+        { 'allowedUsers.email': validatedEmail }
+      ]
+    })
+    .toArray()
+
+  if (!docs.length) {
+    throw Boom.notFound(`No organisations with provided email found`)
+  }
+
+  return docs.map((doc) => mapDocumentWithCurrentStatuses(doc))
+}
+
+const performFindAllByCompanyName = async (db, name) => {
+  // validate the name and throw early
+  let validatedName
+  try {
+    validatedName = validateCompanyName(name)
+  } catch (error) {
+    throw Boom.notFound(`Organisation with name ${name} not found`)
+  }
+
+  const docs = await db
+    .collection(COLLECTION_NAME)
+    .find({ 'companyDetails.name': validatedName })
+    .toArray()
+
+  if (!docs.length) {
+    throw Boom.notFound(`No organisations with name ${name} found`)
+  }
+
+  return docs.map((doc) => mapDocumentWithCurrentStatuses(doc))
+}
+
 const performFindAll = async (db) => {
   const docs = await db.collection(COLLECTION_NAME).find().toArray()
   return docs.map((doc) => mapDocumentWithCurrentStatuses(doc))
@@ -151,6 +211,14 @@ export const createOrganisationsRepository = (db) => () => ({
 
   async findById(id) {
     return performFindById(db, id)
+  },
+
+  async findAllByAssociatedEmail(email) {
+    return performFindAllByAssociatedEmail(db, email)
+  },
+
+  async findAllByCompanyName(name) {
+    return performFindAllByCompanyName(db, name)
   },
 
   async findAll() {

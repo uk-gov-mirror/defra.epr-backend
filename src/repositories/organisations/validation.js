@@ -1,14 +1,36 @@
 import Boom from '@hapi/boom'
 import Joi from 'joi'
 import {
+  companyDetailsSchema,
   idSchema,
   organisationInsertSchema,
   organisationUpdateSchema,
-  statusHistoryItemSchema
+  statusHistoryItemSchema,
+  userSchema
 } from './schema.js'
+
+export const validateEmail = (email) => {
+  const { error, value } = userSchema.extract('email').validate(email)
+
+  if (error) {
+    throw Boom.badData(error.message)
+  }
+
+  return value
+}
 
 export const validateId = (id) => {
   const { error, value } = idSchema.validate(id)
+
+  if (error) {
+    throw Boom.badData(error.message)
+  }
+
+  return value
+}
+
+export const validateCompanyName = (name) => {
+  const { error, value } = companyDetailsSchema.extract('name').validate(name)
 
   if (error) {
     throw Boom.badData(error.message)
@@ -39,6 +61,8 @@ export const validateOrganisationUpdate = (data) => {
 
   if (error) {
     const details = error.details.map((d) => d.message).join('; ')
+    // @fixme: remove
+    console.log('DEBUG: validateOrganisationUpdate', details)
     throw Boom.badData(`Invalid organisation data: ${details}`)
   }
 

@@ -1,5 +1,5 @@
 import { buildOrganisation } from './test-data.js'
-import { STATUS } from '#domain/organisations.js'
+import { STATUS } from '#domain/organisations/status.js'
 
 export const testFindBehaviour = (repositoryFactory) => {
   describe('find', () => {
