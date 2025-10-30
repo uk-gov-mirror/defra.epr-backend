@@ -24,10 +24,11 @@ flowchart LR
 
     %% Defra ID
     defraId_createAccount_1>Create Account]
-    defraId_createAccount_2>Create Account]
-    defraId_addAccount_1>Add another Account]
-    defraId_chooseAccount_1[Choose Account]
-    defraId_chooseAccount_2[Choose Account]
+    defraId_createOrganisation_1>Create Organisation]
+    defraId_createOrganisation_2>Create Organisation]
+    defraId_addOrganisation_1>Add another Organisation]
+    defraId_chooseOrganisation_1[Choose Organisation]
+    defraId_chooseOrganisation_2[Choose Organisation]
     defraId_addService_1[Add Service]
     defraId_dashboard_1[Dashboard]
     defraId_dashboard_2[Dashboard]
@@ -54,16 +55,18 @@ flowchart LR
   %% Decisions
   defraId_loggedIn_1{ Is Initial User<br> Logged In? }
   defraId_loggedIn_2{ Is New User<br> Logged In? }
-  defraId_hasAccount_1{ User have<br> Defra ID Account? }
-  defraId_hasMultipleAccounts_1{ User has multiple<br> Defra ID Accounts? }
+  defraId_hasAccount_1{ User has<br> Defra ID Account? }
+  defraId_hasOrganisation_1{ User has<br> Defra ID Organisation? }
+  defraId_hasMultipleAccounts_1{ User has multiple<br> Defra ID Organisations? }
   pepr_hasValidToken{ User has<br> Valid Token? }
   pepr_isUserNamedOnAtLeastOneOrganisation{ Is User named on<br> at least one approved Organisation? }
-  pepr_doesTokenContainAccountLinkedToOrganisation_1{ Does token contain<br> a Defra ID Account linked to<br> an approved Organisation? }
-  pepr_doesTokenContainAccountLinkedToOrganisation_2{ Does token contain<br> a Defra ID Account linked to<br> an approved Organisation? }
+  pepr_doesTokenContainAccountLinkedToOrganisation_1{ Does token contain<br> a Defra ID Organisation linked to<br> an approved Organisation? }
+  pepr_doesTokenContainAccountLinkedToOrganisation_2{ Does token contain<br> a Defra ID Organisation linked to<br> an approved Organisation? }
   pepr_isUserAbleToAccessMoreThanOneOrganisation{ Is User able to<br> access more than one<br> approved Organisation? }
 
   %% Flows
-  regulator_1-- provides applications info:<br> Initial User,<br> Approvals Statuses,<br> Reg/Acc Numbers,<br> changelog data -->groupInitialLoad
+  regulator_1-- provides applications info:<br> Initial User,<br> Approvals Statuses,<br> Reg/Acc Numbers,<br> changelog data -->
+      groupInitialLoad
 
   subgraph Legend
     direction LR
@@ -77,31 +80,44 @@ flowchart LR
 
   subgraph groupInitialLoad[Initial Load]
     direction LR
-    peprServiceMaintainer_1--imports data-->peprDatabase_1
+    peprServiceMaintainer_1--imports data-->
+        peprDatabase_1
   end
 
-  groupInitialLoad--notifies-->initialUser_1
-  initialUser_1--visits-->groupDefraId
+  groupInitialLoad--notifies-->
+      initialUser_1--visits-->
+          groupDefraId
 
   subgraph groupDefraId[Defra ID]
     direction LR
-    defraId_start_1-->defraId_loggedIn_1
-    defraId_loggedIn_1-- no -->oneLogin_initialUser
+    defraId_start_1-->
+        defraId_loggedIn_1-- no -->
+            oneLogin_initialUser
 
     subgraph oneLogin_initialUser[One Login]
       direction LR
-      oneLogin_register_1-->oneLogin_login_1
+      oneLogin_register_1-->
+          oneLogin_login_1
     end
 
-    oneLogin_initialUser-. redirects to .->defraId_hasAccount_1
-    defraId_loggedIn_1-- yes -->defraId_hasAccount_1
-    defraId_hasAccount_1-- yes -->defraId_addService_1
-    defraId_hasAccount_1-- no -->defraId_createAccount_1
-    defraId_createAccount_1-- redirects to-->defraId_addService_1
-    defraId_addService_1-. redirects to .->defraId_dashboard_1
-    defraId_dashboard_1-- links to -->groupDefraId_addUser
-    defraId_dashboard_1-- links to -->defraId_addAccount_1
-    defraId_addAccount_1-. redirects to .->defraId_dashboard_1
+    oneLogin_initialUser-. redirects to .->
+        defraId_hasAccount_1
+
+    defraId_loggedIn_1-- yes -->
+        defraId_hasAccount_1-- no -->
+            defraId_createAccount_1-- redirects to-->
+                defraId_hasOrganisation_1
+        defraId_hasAccount_1-- yes -->
+            defraId_hasOrganisation_1-- no -->
+                defraId_createOrganisation_1-- redirects to-->
+                    defraId_addService_1
+            defraId_hasOrganisation_1-- yes -->
+                defraId_addService_1-. redirects to .->
+                    defraId_dashboard_1-- links to -->
+                        groupDefraId_addUser
+                    defraId_dashboard_1-- links to -->
+                        defraId_addOrganisation_1-. redirects to .->
+                            defraId_dashboard_1
 
     subgraph groupDefraId_addUser[Add User]
       direction TB
@@ -143,13 +159,13 @@ flowchart LR
                   pepr_doesTokenContainAccountLinkedToOrganisation_1-- yes -->
                       pepr_isUserAbleToAccessMoreThanOneOrganisation
               pepr_isUserNamedOnAtLeastOneOrganisation-- yes -->
-                  pepr_doesTokenContainAccountLinkedToOrganisation_2-. no:<br> link Organisation<br> to Defra ID Account .->
+                  pepr_doesTokenContainAccountLinkedToOrganisation_2-. no:<br> link Organisation<br> to Defra ID Organisation .->
                       peprDatabase_2
                   pepr_doesTokenContainAccountLinkedToOrganisation_2-- yes/no -->
                       pepr_isUserAbleToAccessMoreThanOneOrganisation-- no -->
                           pepr_organisationDashboard
                       pepr_isUserAbleToAccessMoreThanOneOrganisation-- yes -->
-                          pepr_organisationList-- user clicks on Organisation<br> for current Defra ID Account -->
+                          pepr_organisationList-- user clicks on Organisation<br> for current Defra ID Organisation -->
                               pepr_organisationDashboard
                           pepr_organisationList-- user clicks on<br> #quot;switch Organisation#quot; -->
                               groupDefraId_chooseAccount-. redirects to .->
@@ -168,8 +184,8 @@ flowchart LR
         end
 
         oneLogin_loginFlow-->defraId_hasMultipleAccounts_1
-        defraId_hasMultipleAccounts_1-- yes -->defraId_chooseAccount_1
-        defraId_chooseAccount_1-->defraId_exit_3
+        defraId_hasMultipleAccounts_1-- yes -->defraId_chooseOrganisation_1
+        defraId_chooseOrganisation_1-->defraId_exit_3
         defraId_hasMultipleAccounts_1-- no -->defraId_exit_3
       end
 
@@ -179,12 +195,12 @@ flowchart LR
 
     subgraph groupDefraId_chooseAccount[Defra ID]
       direction LR
-      defraId_chooseAccount_2
+      defraId_chooseOrganisation_2
     end
 
     subgraph groupDefraId_createAccount[Defra ID]
       direction LR
-      defraId_createAccount_2
+      defraId_createOrganisation_2
     end
   end
 ```
