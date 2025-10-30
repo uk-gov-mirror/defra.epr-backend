@@ -1,7 +1,7 @@
 # pEPR Low Level Design Auth UI
 
 ```mermaid
-flowchart TB
+flowchart LR
   %% Users
   regulator_1(Regulator)
   peprServiceMaintainer_1(pEPR Service Maintainer)
@@ -11,44 +11,44 @@ flowchart TB
   otherUser_2(New User)
 
   %% Systems
-  peprDatabase_1[(pEPR Database)]
-  peprDatabase_2[(pEPR Database)]
+  peprDatabase_1[(pEPR Organisations)]
+  peprDatabase_2[(pEPR Organisations)]
 
   %% Pages: Start
     %% One Login
-    oneLogin_register_1[[Register]]
-    oneLogin_login_1[[Login]]
-    oneLogin_register_2[[Register]]
-    oneLogin_login_2[[Login]]
-    oneLogin_login_3[[Login]]
+    oneLogin_register_1>Register]
+    oneLogin_login_1>Login]
+    oneLogin_register_2>Register]
+    oneLogin_login_2>Login]
+    oneLogin_login_3>Login]
 
     %% Defra ID
-    defraId_createAccount_1[[Create Account]]
-    defraId_createAccount_2[[Create Account]]
-    defraId_addAccount_1[[Add another Account]]
-    defraId_chooseAccount_1[[Choose Account]]
-    defraId_chooseAccount_2[[Choose Account]]
-    defraId_addService_1[[Add Service]]
-    defraId_dashboard_1[[Dashboard]]
-    defraId_dashboard_2[[Dashboard]]
-    defraId_addUser_1[[Add User]]
-    defraId_userPending_1[[User pending approval]]
-    defraId_userApproval_1[[User approval]]
+    defraId_createAccount_1>Create Account]
+    defraId_createAccount_2>Create Account]
+    defraId_addAccount_1>Add another Account]
+    defraId_chooseAccount_1[Choose Account]
+    defraId_chooseAccount_2[Choose Account]
+    defraId_addService_1[Add Service]
+    defraId_dashboard_1[Dashboard]
+    defraId_dashboard_2[Dashboard]
+    defraId_addUser_1[Add User]
+    defraId_userPending_1[User pending approval]
+    defraId_userApproval_1>User approval]
 
     %% pEPR Service
-    pepr_Authenticate[[Authenticate]]
-    pepr_unauthenticated[[Unauthenticated]]
-    pepr_unauthorised[[Unauthorised]]
-    pepr_organisationList[[Organisation List]]
-    pepr_organisationDashboard[[Organisation Dashboard]]
+    pepr_Authenticate[Authenticate]
+    pepr_unauthenticated[Unauthenticated]
+    pepr_unauthorised[Unauthorised]
+    pepr_organisationList[Organisation List]
+    pepr_organisationDashboard[Organisation Dashboard]
 
   %% Pages: End
 
   %% Terminals
   defraId_start_1((Start))
   defraId_start_2((Start))
-  defraId_exit_1((Go to:<br> pEPR Service))
-  defraId_exit_3((Go to:<br> pEPR Service))
+  defraId_exit_1((Go to:<br> pEPR Service Start))
+  defraId_exit_3((Go to:<br> pEPR Service Start))
   pepr_start((Start))
 
   %% Decisions
@@ -64,6 +64,16 @@ flowchart TB
 
   %% Flows
   regulator_1-- provides applications info:<br> Initial User,<br> Approvals Statuses,<br> Reg/Acc Numbers,<br> changelog data -->groupInitialLoad
+
+  subgraph Legend
+    direction LR
+    startEnd((Start or End<br> of process))
+    actor(Actor)
+    page[Page]
+    flow>Flow of Pages]
+    logic{ Logic }
+    database[(Database)]
+  end
 
   subgraph groupInitialLoad[Initial Load]
     direction LR
@@ -133,7 +143,7 @@ flowchart TB
                   pepr_doesTokenContainAccountLinkedToOrganisation_1-- yes -->
                       pepr_isUserAbleToAccessMoreThanOneOrganisation
               pepr_isUserNamedOnAtLeastOneOrganisation-- yes -->
-                  pepr_doesTokenContainAccountLinkedToOrganisation_2-- no: link Organisation to Defra ID Account -->
+                  pepr_doesTokenContainAccountLinkedToOrganisation_2-. no:<br> link Organisation<br> to Defra ID Account .->
                       peprDatabase_2
                   pepr_doesTokenContainAccountLinkedToOrganisation_2-- yes/no -->
                       pepr_isUserAbleToAccessMoreThanOneOrganisation-- no -->
@@ -141,10 +151,10 @@ flowchart TB
                       pepr_isUserAbleToAccessMoreThanOneOrganisation-- yes -->
                           pepr_organisationList-- user clicks on Organisation<br> for current Defra ID Account -->
                               pepr_organisationDashboard
-                          pepr_organisationList-- user clicks on #quot;switch Organisation#quot; -->
+                          pepr_organisationList-- user clicks on<br> #quot;switch Organisation#quot; -->
                               groupDefraId_chooseAccount-. redirects to .->
                                   pepr_organisationList
-                          pepr_organisationList-- user clicks on #quot;add Organisation#quot; -->
+                          pepr_organisationList-- user clicks on<br> #quot;add Organisation#quot; -->
                               groupDefraId_createAccount-. redirects to .->
                                   pepr_organisationList
 
