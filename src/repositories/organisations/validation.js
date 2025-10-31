@@ -1,16 +1,32 @@
 import Boom from '@hapi/boom'
 import Joi from 'joi'
 import {
-  companyDetailsSchema,
   idSchema,
+  defraIdOrgIdSchema,
   organisationInsertSchema,
   organisationUpdateSchema,
   statusHistoryItemSchema,
-  userSchema
+  userWithRolesSchema
 } from './schema.js'
 
-export const validateEmail = (email) => {
-  const { error, value } = userSchema.extract('email').validate(email)
+export const validateUser = (options = {}) => {
+  const entries = Object.entries(options)
+
+  return entries.map(([optionKey, optionValue]) => {
+    const { error, value } = userWithRolesSchema
+      .extract(optionKey)
+      .validate(optionValue)
+
+    if (error) {
+      throw Boom.badData(error.message)
+    }
+
+    return [optionKey, value]
+  })
+}
+
+export const validateDefraIdOrgId = (defraIdOrgId) => {
+  const { error, value } = defraIdOrgIdSchema.validate(defraIdOrgId)
 
   if (error) {
     throw Boom.badData(error.message)
@@ -21,16 +37,6 @@ export const validateEmail = (email) => {
 
 export const validateId = (id) => {
   const { error, value } = idSchema.validate(id)
-
-  if (error) {
-    throw Boom.badData(error.message)
-  }
-
-  return value
-}
-
-export const validateCompanyName = (name) => {
-  const { error, value } = companyDetailsSchema.extract('name').validate(name)
 
   if (error) {
     throw Boom.badData(error.message)

@@ -3,6 +3,7 @@ import { ObjectId } from 'mongodb'
 import {
   STATUS,
   REGULATOR,
+  ROLE,
   WASTE_PROCESSING_TYPE,
   NATION,
   BUSINESS_TYPE,
@@ -14,6 +15,11 @@ import {
   RECYCLING_PROCESS,
   TONNAGE_BAND
 } from '#domain/organisations/status.js'
+export const defraIdOrgIdSchema = Joi.string().required().messages({
+  'any.required': 'id is required',
+  'string.empty': 'id cannot be empty',
+  'string.base': 'id must be a string'
+})
 export const idSchema = Joi.string()
   .required()
   .custom((value, helpers) => {
@@ -48,6 +54,13 @@ export const userSchema = Joi.object({
   role: Joi.string().optional(),
   title: Joi.string().optional()
 }).or('role', 'title')
+
+export const userWithRolesSchema = Joi.object({
+  fullName: Joi.string().required(),
+  email: Joi.string().email().required(),
+  roles: Joi.array().items(ROLE.STANDARD_USER).optional(),
+  isInitialUser: Joi.boolean()
+})
 
 export const statusHistoryItemSchema = Joi.object({
   status: Joi.string()
@@ -351,6 +364,8 @@ export const organisationInsertSchema = Joi.object({
     .optional(),
   id: idSchema,
   orgId: Joi.number().required(),
+  defraIdOrgId: defraIdOrgIdSchema.optional(),
+  users: Joi.array().items(userWithRolesSchema),
   status: Joi.string()
     .valid(
       STATUS.CREATED,

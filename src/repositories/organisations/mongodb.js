@@ -1,7 +1,7 @@
 import {
-  validateEmail,
+  validateUser,
+  validateDefraIdOrgId,
   validateId,
-  validateCompanyName,
   validateOrganisationInsert,
   validateOrganisationUpdate
 } from './validation.js'
@@ -14,7 +14,7 @@ import {
 } from './helpers.js'
 import Boom from '@hapi/boom'
 import { ObjectId } from 'mongodb'
-import { getAllowedUsers } from '#domain/organisations/get-allowed-users.js'
+import { generateInitialUsers } from '#domain/organisations/generate-initial-users.js'
 
 const COLLECTION_NAME = 'epr-organisations'
 const MONGODB_DUPLICATE_KEY_ERROR_CODE = 11000
@@ -63,7 +63,7 @@ const performInsert = async (db, organisation) => {
   try {
     await db.collection(COLLECTION_NAME).insertOne({
       ...data,
-      allowedUsers: getAllowedUsers(data)
+      users: generateInitialUsers(data)
     })
   } catch (error) {
     if (error.code === MONGODB_DUPLICATE_KEY_ERROR_CODE) {
@@ -74,6 +74,8 @@ const performInsert = async (db, organisation) => {
 }
 
 const performUpdate = async (db, id, version, updates) => {
+  console.log('DEBUG: performUpdate', updates)
+
   const validatedId = validateId(id)
   const validatedUpdates = validateOrganisationUpdate(updates)
 
@@ -110,10 +112,7 @@ const performUpdate = async (db, id, version, updates) => {
   const result = await db.collection(COLLECTION_NAME).updateOne(
     { _id: ObjectId.createFromHexString(validatedId), version },
     {
-      $set: {
-        ...data,
-        allowedUsers: getAllowedUsers(data)
-      }
+      $set: data
     }
   )
 
@@ -144,48 +143,49 @@ const performFindById = async (db, id) => {
   return mapDocumentWithCurrentStatuses(doc)
 }
 
-const performFindAllByAssociatedEmail = async (db, email) => {
-  // validate the name and throw early
-  let validatedEmail
+const performFindAllByDefraIdOrgId = async (db, defraIdOrgId) => {
+  // validate the ID and throw early
+  let validatedDefraIdOrgId
   try {
-    validatedEmail = validateEmail(email)
+    validatedDefraIdOrgId = validateDefraIdOrgId(defraIdOrgId)
+  } catch (error) {
+    throw Boom.notFound(
+      `Organisation with defraIdOrgId ${defraIdOrgId} not found`
+    )
+  }
+
+  const doc = await db
+    .collection(COLLECTION_NAME)
+    .findOne({ defraIdOrgId: validatedDefraIdOrgId })
+
+  if (!doc) {
+    throw Boom.notFound(`Organisation with id ${defraIdOrgId} not found`)
+  }
+
+  return mapDocumentWithCurrentStatuses(doc)
+}
+
+const performFindAllByUser = async (db, options) => {
+  // validate the name and throw early
+  let validatedUserEntries
+  try {
+    validatedUserEntries = validateUser(options)
   } catch (error) {
     throw Boom.notFound(`Organisation with provided email not found`)
   }
 
   const docs = await db
     .collection(COLLECTION_NAME)
-    .find({
-      $or: [
-        { 'registrations.approvedPersons.email': validatedEmail },
-        { 'allowedUsers.email': validatedEmail }
-      ]
-    })
+    .find(
+      validatedUserEntries.reduce(
+        (prev, [key, value]) => ({ ...prev, [`users.${key}`]: value }),
+        {}
+      )
+    )
     .toArray()
 
   if (!docs.length) {
     throw Boom.notFound(`No organisations with provided email found`)
-  }
-
-  return docs.map((doc) => mapDocumentWithCurrentStatuses(doc))
-}
-
-const performFindAllByCompanyName = async (db, name) => {
-  // validate the name and throw early
-  let validatedName
-  try {
-    validatedName = validateCompanyName(name)
-  } catch (error) {
-    throw Boom.notFound(`Organisation with name ${name} not found`)
-  }
-
-  const docs = await db
-    .collection(COLLECTION_NAME)
-    .find({ 'companyDetails.name': validatedName })
-    .toArray()
-
-  if (!docs.length) {
-    throw Boom.notFound(`No organisations with name ${name} found`)
   }
 
   return docs.map((doc) => mapDocumentWithCurrentStatuses(doc))
@@ -213,12 +213,12 @@ export const createOrganisationsRepository = (db) => () => ({
     return performFindById(db, id)
   },
 
-  async findAllByAssociatedEmail(email) {
-    return performFindAllByAssociatedEmail(db, email)
+  async findAllByUser(email) {
+    return performFindAllByUser(db, email)
   },
 
-  async findAllByCompanyName(name) {
-    return performFindAllByCompanyName(db, name)
+  async findAllByDefraIdOrgId(defraIdOrgId) {
+    return performFindAllByDefraIdOrgId(db, defraIdOrgId)
   },
 
   async findAll() {

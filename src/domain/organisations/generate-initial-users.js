@@ -1,8 +1,8 @@
-import { STATUS } from './status.js'
+import { ROLE, STATUS } from './status.js'
 
 const eligibleStatuses = [STATUS.APPROVED, STATUS.ACTIVE, STATUS.SUSPENDED]
 
-export function getAllowedUsers({
+export function generateInitialUsers({
   accreditations,
   allowedUsers,
   registrations,
@@ -45,7 +45,15 @@ export function getAllowedUsers({
         (prev, user) =>
           prev.find(({ email }) => user.email === email)
             ? prev
-            : [...prev, user],
+            : [
+                ...prev,
+                {
+                  fullName: user.fullName,
+                  email: user.email,
+                  isInitialUser: true,
+                  roles: [ROLE.STANDARD_USER]
+                }
+              ],
         []
       )
     : []

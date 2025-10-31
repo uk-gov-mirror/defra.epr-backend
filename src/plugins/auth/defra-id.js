@@ -1,4 +1,5 @@
-import { STATUS } from '#domain/organisations/status.js'
+import { ROLE, STATUS } from '#domain/organisations/status.js'
+import { defraIdOrgIdSchema } from '#repositories/organisations/schema.js'
 
 function getCurrentRelationship({ currentRelationshipId, relationships }) {
   return relationships.find((relationship) =>
@@ -6,21 +7,33 @@ function getCurrentRelationship({ currentRelationshipId, relationships }) {
   )
 }
 
-async function findOrganisationMatches(email, orgNameFromToken, request) {
+async function findOrganisationMatches(email, defraIdOrgId, request) {
   const { organisationsRepository } = request
-  const organisationsByEmail =
-    await organisationsRepository.findAllByAssociatedEmail(email)
+  let organisationsByDefraIdOrgId
 
-  /**
-   * @todo: do we even need to match organisations by name?
-   * Handling matches by OrgName adds a lot of complexity that we don't need if
-   * the emails can be extracted from the organisation data.
-   */
-  // const organisationsByName =
-  //   await organisationsRepository.findAllByCompanyName(orgNameFromToken)
-  const organisationsByName = []
+  const organisationsByEmail = await organisationsRepository.findAllByUser({
+    email,
+    isInitialUser: true
+  })
 
-  return [...organisationsByName, ...organisationsByEmail].reduce(
+  try {
+    organisationsByDefraIdOrgId = [
+      await organisationsRepository.findAllByDefraIdOrgId(defraIdOrgId)
+    ]
+  } catch (error) {
+    organisationsByDefraIdOrgId = []
+
+    // @todo: log this scenario
+  }
+
+  console.log(
+    'DEBUG: findOrganisationMatches',
+    organisationsByEmail,
+    organisationsByDefraIdOrgId,
+    defraIdOrgId
+  )
+
+  return [...organisationsByEmail, ...organisationsByDefraIdOrgId].reduce(
     (prev, organisation) =>
       prev.find(({ id }) => id === organisation.id)
         ? prev
@@ -29,25 +42,48 @@ async function findOrganisationMatches(email, orgNameFromToken, request) {
   )
 }
 
-function isAllowedUser(organisation, email) {
-  return organisation.allowedUsers.find((user) => user.email === email)
+function isLinkedUser(organisation, defraIdOrgId) {
+  const isLinked = organisation.defraIdOrgId === defraIdOrgId
+
+  console.log('DEBUG: isLinkedUser', { defraIdOrgId, isLinked })
+
+  return isLinked
 }
 
-function getOrgNameFromToken(tokenPayload) {
-  const relationship = getCurrentRelationship(tokenPayload)
-  const [, , organisationName] = relationship?.split(':')
+function isKnownUser(organisation, email) {
+  const isKnown = !!organisation.users.find((user) => user.email === email)
 
-  return organisationName?.trim()
+  console.log('DEBUG: isKnownUser', { email, isKnown })
+
+  return isKnown
+}
+
+function isAuthorisedUser(organisation, { defraIdOrgId, email }) {
+  const isAuthorised =
+    isLinkedUser(organisation, defraIdOrgId) || isKnownUser(organisation, email)
+  console.log('DEBUG: isAuthorisedUser', { defraIdOrgId, email, isAuthorised })
+
+  return isAuthorised
+}
+
+function getOrgDataFromToken(tokenPayload) {
+  const relationship = getCurrentRelationship(tokenPayload)
+  const [, organisationId, organisationName] = relationship?.split(':')
+
+  return {
+    defraIdOrgId: organisationId,
+    defraIdOrgName: organisationName?.trim()
+  }
 }
 
 async function getScope(email, tokenPayload, request) {
   const { organisationsRepository, params = {} } = request
   const { organisationId } = params
-  const orgNameFromToken = getOrgNameFromToken(tokenPayload)
+  const { defraIdOrgId } = getOrgDataFromToken(tokenPayload)
 
-  // No organisation name to match on
-  if (!orgNameFromToken) {
-    console.warn('No organisation name found in token')
+  // No defraIdOrgId to link
+  if (!defraIdOrgId) {
+    console.warn('No defraIdOrgId found in token')
 
     return []
   }
@@ -61,13 +97,41 @@ async function getScope(email, tokenPayload, request) {
 
     // Organisation has a status allowing it to be accessed
     if ([STATUS.ACTIVE, STATUS.SUSPENDED].includes(organisationById.status)) {
-      return isAllowedUser(organisationById, email) ? ['user'] : []
+      const isLinked = isLinkedUser(organisationById, defraIdOrgId)
+      const isKnown = isKnownUser(organisationById, email)
+      const isAuthorised = isLinked || isKnown
+      const shouldAddUser = isLinked && !isKnown
+
+      console.log('DEBUG: organisation is active or suspended', {
+        isAuthorised,
+        shouldAddUser
+      })
+
+      if (shouldAddUser) {
+        await organisationsRepository.update(
+          organisationById.id,
+          organisationById.version,
+          {
+            users: [
+              ...organisationById.users,
+              {
+                email,
+                fullName: `${tokenPayload.firstName} ${tokenPayload.lastName}`,
+                isInitialUser: false,
+                roles: [ROLE.STANDARD_USER]
+              }
+            ]
+          }
+        )
+      }
+
+      return isAuthorised ? ['user'] : []
     }
   }
 
   const [organisation, ...otherOrganisations] = await findOrganisationMatches(
     email,
-    orgNameFromToken,
+    defraIdOrgId,
     request
   )
 
@@ -102,24 +166,33 @@ async function getScope(email, tokenPayload, request) {
   // Organisation is approved and the user is associated with it
   if (
     organisation.status === STATUS.APPROVED &&
-    isAllowedUser(organisation, email)
+    isAuthorisedUser(organisation, { defraIdOrgId, email })
   ) {
     console.log('DEBUG: approve organisation', organisation)
+
+    if (!organisation.defraIdOrgId) {
+      console.log('Linking organisation to defraIdOrgId', defraIdOrgId)
+    }
 
     await organisationsRepository.update(
       organisation.id,
       organisation.version,
       {
         status: STATUS.ACTIVE,
-        registrations: organisation.registrations.map((registration) =>
-          registration.status === STATUS.APPROVED
-            ? { ...registration, status: STATUS.ACTIVE }
-            : {}
+        defraIdOrgId: `${defraIdOrgId}`,
+        registrations: organisation.registrations.reduce(
+          (prev, registration) =>
+            registration.status === STATUS.APPROVED
+              ? [...prev, { ...registration, status: STATUS.ACTIVE }]
+              : prev,
+          []
         ),
-        accreditations: organisation.accreditations.map((accreditation) =>
-          accreditation.status === STATUS.APPROVED
-            ? { ...accreditation, status: STATUS.ACTIVE }
-            : {}
+        accreditations: organisation.accreditations.reduce(
+          (prev, accreditation) =>
+            accreditation.status === STATUS.APPROVED
+              ? [...prev, { ...accreditation, status: STATUS.ACTIVE }]
+              : prev,
+          []
         )
       }
     )

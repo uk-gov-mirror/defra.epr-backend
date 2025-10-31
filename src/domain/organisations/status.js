@@ -7,6 +7,10 @@ export const STATUS = {
   ARCHIVED: 'archived'
 }
 
+export const ROLE = {
+  STANDARD_USER: 'standardUser'
+}
+
 export const REGULATOR = {
   EA: 'ea',
   NRW: 'nrw',
