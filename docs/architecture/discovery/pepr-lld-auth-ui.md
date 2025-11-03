@@ -40,6 +40,7 @@ flowchart LR
     pepr_Authenticate[Authenticate]
     pepr_unauthenticated[Unauthenticated]
     pepr_unauthorised[Unauthorised]
+    pepr_confirmOrganisation[Confirm Organisation]
     pepr_organisationList[Organisation List]
     pepr_organisationDashboard[Organisation Dashboard]
 
@@ -60,10 +61,9 @@ flowchart LR
   defraId_isAdminForOrganisation{ User is Admin for<br> Defra ID Organisation? }
   defraId_hasMultipleAccounts{ User has multiple<br> Defra ID Organisations? }
   pepr_hasValidToken{ User has<br> Valid Token? }
-  pepr_isUserNamedOnAtLeastOneOrganisation{ Is User named on<br> at least one approved<br> pEPR Organisation? }
-  pepr_doesTokenContainAccountLinkedToOrganisation_1{ Does token contain<br> a Defra ID Organisation linked to<br> an approved pEPR Organisation? }
-  pepr_doesTokenContainAccountLinkedToOrganisation_2{ Does token contain<br> a Defra ID Organisation linked to<br> an approved pEPR Organisation? }
-  pepr_isUserAbleToAccessMoreThanOneOrganisation{ Is User able to<br> access more than one<br> approved pEPR Organisation? }
+  pepr_isCurrentRelationshipLinkedOrganisation{ Does token contain a current<br> Defra ID Organisation Id found<br> in approved pEPR Organisations? }
+  pepr_isUserNamedOnAtLeastOneOrganisation{ Is the User an InitialUser<br> on at least one approved<br> pEPR Organisation? }
+  pepr_hasUserConfirmedOrganisationLink{ Has User confirmed<br> Organisation link? }
 
   %% Flows
   regulator-- provides applications info:<br> Initial User,<br> Approvals Statuses,<br> Reg/Acc Numbers,<br> changelog data -->
@@ -107,10 +107,11 @@ flowchart LR
     defraId_loggedIn_1-- yes -->
         defraId_hasAccount-- no -->
             defraId_createAccount-- redirects to-->
-                defraId_hasOrganisation-- no -->
-                    defraId_createOrganisation_1-- redirects to-->
-                        defraId_addService
+                defraId_createOrganisation_1-- redirects to-->
+                    defraId_addService
         defraId_hasAccount-- yes -->
+            defraId_hasOrganisation-- no -->
+                defraId_createOrganisation_1
             defraId_hasOrganisation-- yes -->
                 defraId_isAdminForOrganisation-- no -->
                     askForAdminAccess[End of Journey: Ask for Admin access]
@@ -156,26 +157,23 @@ flowchart LR
           pepr_hasValidToken-- no -->
               pepr_unauthenticated
           pepr_hasValidToken-- yes -->
-              pepr_isUserNamedOnAtLeastOneOrganisation-- no -->
-                  pepr_doesTokenContainAccountLinkedToOrganisation_1-- no -->
+              pepr_isCurrentRelationshipLinkedOrganisation-- no -->
+                  pepr_isUserNamedOnAtLeastOneOrganisation-- no -->
                       pepr_unauthorised
-                  pepr_doesTokenContainAccountLinkedToOrganisation_1-- yes -->
-                      pepr_isUserAbleToAccessMoreThanOneOrganisation
-              pepr_isUserNamedOnAtLeastOneOrganisation-- yes -->
-                  pepr_doesTokenContainAccountLinkedToOrganisation_2-. no:<br> link pEPR Organisation<br> to Defra ID Organisation .->
-                      peprDatabase_2
-                  pepr_doesTokenContainAccountLinkedToOrganisation_2-- yes/no -->
-                      pepr_isUserAbleToAccessMoreThanOneOrganisation-- no -->
-                          pepr_organisationDashboard
-                      pepr_isUserAbleToAccessMoreThanOneOrganisation-- yes -->
-                          pepr_organisationList-- user clicks on Organisation<br> for current Defra ID Organisation -->
-                              pepr_organisationDashboard
-                          pepr_organisationList-- user clicks on<br> #quot;switch Organisation#quot; -->
+                  pepr_isUserNamedOnAtLeastOneOrganisation-- yes -->
+                      pepr_confirmOrganisation-->
+                          pepr_hasUserConfirmedOrganisationLink-- no: switch Organisation -->
                               groupDefraId_chooseAccount-. redirects to .->
-                                  pepr_organisationList
-                          pepr_organisationList-- user clicks on<br> #quot;add Organisation#quot; -->
+                                  pepr_organisationDashboard
+                          pepr_hasUserConfirmedOrganisationLink-- no: add Organisation -->
                               groupDefraId_createAccount-. redirects to .->
-                                  pepr_organisationList
+                                  pepr_organisationDashboard
+                          pepr_hasUserConfirmedOrganisationLink-. yes: link pEPR Organisation<br> to Defra ID Organisation .->
+                              peprDatabase_2
+                          pepr_hasUserConfirmedOrganisationLink-- yes -->
+                              pepr_organisationDashboard
+              pepr_isCurrentRelationshipLinkedOrganisation-- yes -->
+                  pepr_organisationDashboard
 
       subgraph groupDefraId_authenticate[Defra ID]
         direction TB
@@ -197,7 +195,7 @@ flowchart LR
 
 
     subgraph groupDefraId_chooseAccount[Defra ID]
-      direction LR
+      direction TB
       defraId_chooseOrganisation_2
     end
 
