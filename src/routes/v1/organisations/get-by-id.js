@@ -10,7 +10,8 @@ export const organisationsGetById = {
   path: organisationsGetByIdPath,
   options: {
     auth: {
-      strategy: 'access-token',
+      // strategy: 'access-token',
+      strategy: 'defra-id-access-token', // @todo: workaround for strategy-delegation not allowing h.response()
       access: {
         // only permit access to this endpoint if (logged in) user has either the service_maintainer or user scope
         scope: ['service_maintainer', 'user']

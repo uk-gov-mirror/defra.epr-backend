@@ -399,6 +399,7 @@ In this example:
     {
       id: 'd1234567890a12345a01',
       status: 'created',
+      addedToWasteBalance: true,
       createdAt: '2026-01-08T12:00:00.000Z',
       createdBy: {
         _id: 'c1234567890a12345a01',
@@ -415,6 +416,7 @@ In this example:
     {
       id: 'd1234567890a12345a02',
       status: 'updated',
+      addedToWasteBalance: true,
       createdAt: '2026-01-09T12:00:00.000Z',
       createdBy: {
         _id: 'c1234567890a12345a02',
@@ -429,6 +431,7 @@ In this example:
       id: 'd1234567890a12345a03',
       notificationId: 'e1234567890a12345a01',
       status: 'pending',
+      addedToWasteBalance: false,
       createdAt: '2026-02-28T12:00:00.000Z',
       createdBy: {
         _id: 'c1234567890a12345a01',
@@ -471,6 +474,7 @@ In this example Alice has created a `processed` waste record
     {
       id: 'd1234567890a12345a01',
       status: 'created',
+      addedToWasteBalance: true,
       createdAt: '2026-01-08T12:00:00.000Z',
       createdBy: {
         _id: 'c1234567890a12345a01',
@@ -516,6 +520,7 @@ In this example Alice has created a `sentOn` waste record
     {
       id: 'd1234567890a12345a01',
       status: 'created',
+      addedToWasteBalance: true,
       createdAt: '2026-01-08T12:00:00.000Z',
       createdBy: {
         _id: 'c1234567890a12345a01',

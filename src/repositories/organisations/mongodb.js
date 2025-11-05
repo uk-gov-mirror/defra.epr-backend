@@ -143,7 +143,7 @@ const performFindById = async (db, id) => {
   return mapDocumentWithCurrentStatuses(doc)
 }
 
-const performFindAllByDefraIdOrgId = async (db, defraIdOrgId) => {
+const performFindByDefraIdOrgId = async (db, defraIdOrgId) => {
   // validate the ID and throw early
   let validatedDefraIdOrgId
   try {
@@ -159,13 +159,15 @@ const performFindAllByDefraIdOrgId = async (db, defraIdOrgId) => {
     .findOne({ defraIdOrgId: validatedDefraIdOrgId })
 
   if (!doc) {
-    throw Boom.notFound(`Organisation with id ${defraIdOrgId} not found`)
+    // throw Boom.notFound(`Organisation with id ${defraIdOrgId} not found`)
+
+    return null
   }
 
   return mapDocumentWithCurrentStatuses(doc)
 }
 
-const performFindAllByUser = async (db, options) => {
+const performFindAllLinkedOrganisationsByUser = async (db, options) => {
   // validate the name and throw early
   let validatedUserEntries
   try {
@@ -176,16 +178,19 @@ const performFindAllByUser = async (db, options) => {
 
   const docs = await db
     .collection(COLLECTION_NAME)
-    .find(
-      validatedUserEntries.reduce(
+    .find({
+      ...validatedUserEntries.reduce(
         (prev, [key, value]) => ({ ...prev, [`users.${key}`]: value }),
         {}
-      )
-    )
+      ),
+      defraIdOrgId: { $exists: false }
+    })
     .toArray()
 
   if (!docs.length) {
-    throw Boom.notFound(`No organisations with provided email found`)
+    // throw Boom.notFound(`No organisations with provided email found`)
+
+    return []
   }
 
   return docs.map((doc) => mapDocumentWithCurrentStatuses(doc))
@@ -213,12 +218,12 @@ export const createOrganisationsRepository = (db) => () => ({
     return performFindById(db, id)
   },
 
-  async findAllByUser(email) {
-    return performFindAllByUser(db, email)
+  async findAllLinkedOrganisationsByUser(userOptions) {
+    return performFindAllLinkedOrganisationsByUser(db, userOptions)
   },
 
-  async findAllByDefraIdOrgId(defraIdOrgId) {
-    return performFindAllByDefraIdOrgId(db, defraIdOrgId)
+  async findByDefraIdOrgId(defraIdOrgId) {
+    return performFindByDefraIdOrgId(db, defraIdOrgId)
   },
 
   async findAll() {

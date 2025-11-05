@@ -37,7 +37,7 @@ flowchart LR
     defraId_userApproval>User approval]
 
     %% pEPR Service
-    pepr_Authenticate[Authenticate]
+    pepr_authenticate[Authenticate]
     pepr_unauthenticated[Unauthenticated]
     pepr_unauthorised[Unauthorised]
     pepr_confirmOrganisation[Confirm Organisation]
@@ -153,7 +153,7 @@ flowchart LR
 
   subgraph peprServiceSingleOrganisation[pEPR Service]
     pepr_start-->
-      pepr_Authenticate-->
+      pepr_authenticate-->
           pepr_hasValidToken-- no -->
               pepr_unauthenticated
           pepr_hasValidToken-- yes -->
@@ -164,10 +164,10 @@ flowchart LR
                       pepr_confirmOrganisation-->
                           pepr_hasUserConfirmedOrganisationLink-- no: switch Organisation -->
                               groupDefraId_chooseAccount-. redirects to .->
-                                  pepr_organisationDashboard
+                                  pepr_authenticate
                           pepr_hasUserConfirmedOrganisationLink-- no: add Organisation -->
                               groupDefraId_createAccount-. redirects to .->
-                                  pepr_organisationDashboard
+                                  pepr_authenticate
                           pepr_hasUserConfirmedOrganisationLink-. yes: link pEPR Organisation<br> to Defra ID Organisation .->
                               peprDatabase_2
                           pepr_hasUserConfirmedOrganisationLink-- yes -->
@@ -191,7 +191,7 @@ flowchart LR
       end
 
       pepr_unauthenticated-. redirects to .->groupDefraId_authenticate
-      groupDefraId_authenticate-. redirects to .->pepr_Authenticate
+      groupDefraId_authenticate-. redirects to .->pepr_authenticate
 
 
     subgraph groupDefraId_chooseAccount[Defra ID]
@@ -205,3 +205,44 @@ flowchart LR
     end
   end
 ```
+
+## Single organisation:
+
+### Confirm Organisation
+
+We've found a potential match for your organisation
+
+#### Your Organisation
+
+ABC Limited
+
+#### Organisation data in this Service
+
+Name: **ABC LTD**
+
+Org ID: **500001**
+
+System Reference Number: **6507f1f77bcf86cd79943900**
+
+[This is correct](/)
+
+[This is incorrect](/)
+
+---
+
+## Multiple organisations:
+
+## Confirm Organisation
+
+We've found a list of potential matches for your organisation
+
+### Your Organisation
+
+ABC Limited
+
+### Organisation data
+
+| Org Name | OrgId  | System Reference Number  | Action    |
+| -------- | ------ | ------------------------ | --------- |
+| ABC LTD  | 500001 | 6507f1f77bcf86cd79943900 | [Link](/) |
+| ABC LTD  | 500001 | 6507f1f77bcf86cd79943900 | [Link](/) |

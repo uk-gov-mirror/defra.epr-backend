@@ -1,108 +1,127 @@
 import { ROLE, STATUS } from '#domain/organisations/status.js'
-import { defraIdOrgIdSchema } from '#repositories/organisations/schema.js'
+import { organisationsLinkPath } from '#domain/organisations/paths.js'
+import { StatusCodes } from 'http-status-codes'
 
-function getCurrentRelationship({ currentRelationshipId, relationships }) {
-  return relationships.find((relationship) =>
-    relationship.startsWith(`${currentRelationshipId}:`)
-  )
+function getCurrentRelationship(relationships) {
+  return relationships.find(({ isCurrent }) => isCurrent)
 }
 
 async function findOrganisationMatches(email, defraIdOrgId, request) {
   const { organisationsRepository } = request
-  let organisationsByDefraIdOrgId
-
-  const organisationsByEmail = await organisationsRepository.findAllByUser({
-    email,
-    isInitialUser: true
-  })
+  let linkedOrganisations
+  let unlinkedOrganisations
 
   try {
-    organisationsByDefraIdOrgId = [
-      await organisationsRepository.findAllByDefraIdOrgId(defraIdOrgId)
-    ]
+    unlinkedOrganisations =
+      await organisationsRepository.findAllLinkedOrganisationsByUser({
+        email,
+        isInitialUser: true
+      })
+    const linkedOrganisationId =
+      await organisationsRepository.findByDefraIdOrgId(defraIdOrgId)
+    linkedOrganisations = linkedOrganisationId ? [linkedOrganisationId] : []
   } catch (error) {
-    organisationsByDefraIdOrgId = []
+    linkedOrganisations = []
+    unlinkedOrganisations = []
 
-    // @todo: log this scenario
+    request.logger.error(error, 'defra-id: failed to find Organisation matches')
   }
 
-  console.log(
-    'DEBUG: findOrganisationMatches',
-    organisationsByEmail,
-    organisationsByDefraIdOrgId,
+  request.logger.debug('defra-id: findOrganisationMatches', {
+    unlinkedOrganisations,
+    linkedOrganisations,
     defraIdOrgId
-  )
+  })
 
-  return [...organisationsByEmail, ...organisationsByDefraIdOrgId].reduce(
-    (prev, organisation) =>
-      prev.find(({ id }) => id === organisation.id)
-        ? prev
-        : [...prev, organisation],
-    []
-  )
+  return {
+    all: [...unlinkedOrganisations, ...linkedOrganisations].reduce(
+      (prev, organisation) =>
+        prev.find(({ id }) => id === organisation.id)
+          ? prev
+          : [...prev, organisation],
+      []
+    ),
+    unlinked: unlinkedOrganisations,
+    linked: linkedOrganisations
+  }
 }
 
 function isLinkedUser(organisation, defraIdOrgId) {
-  const isLinked = organisation.defraIdOrgId === defraIdOrgId
-
-  console.log('DEBUG: isLinkedUser', { defraIdOrgId, isLinked })
-
-  return isLinked
+  return organisation.defraIdOrgId === defraIdOrgId
 }
 
-function isKnownUser(organisation, email) {
-  const isKnown = !!organisation.users.find((user) => user.email === email)
-
-  console.log('DEBUG: isKnownUser', { email, isKnown })
-
-  return isKnown
-}
-
-function isAuthorisedUser(organisation, { defraIdOrgId, email }) {
-  const isAuthorised =
-    isLinkedUser(organisation, defraIdOrgId) || isKnownUser(organisation, email)
-  console.log('DEBUG: isAuthorisedUser', { defraIdOrgId, email, isAuthorised })
-
-  return isAuthorised
+function isInitialUser(organisation, email) {
+  return !!organisation.users.find(
+    (user) => user.email === email && !!user.isInitialUser
+  )
 }
 
 function getOrgDataFromToken(tokenPayload) {
-  const relationship = getCurrentRelationship(tokenPayload)
-  const [, organisationId, organisationName] = relationship?.split(':')
+  const { currentRelationshipId, relationships } = tokenPayload
 
-  return {
-    defraIdOrgId: organisationId,
-    defraIdOrgName: organisationName?.trim()
-  }
+  return relationships.map((relationship) => {
+    const [relationshipId, organisationId, organisationName] =
+      relationship?.split(':')
+
+    return {
+      defraIdRelationshipId: relationshipId,
+      defraIdOrgId: organisationId,
+      defraIdOrgName: organisationName?.trim(),
+      isCurrent: currentRelationshipId === relationshipId
+    }
+  })
 }
 
-async function getScope(email, tokenPayload, request) {
+function getOrganisationsSummary(organisations) {
+  return organisations.map(({ orgId, id, companyDetails }) => ({
+    id,
+    orgId,
+    name: companyDetails.name,
+    tradingName: companyDetails.tradingName
+  }))
+}
+
+async function validateRequest(tokenPayload, request, h) {
+  const { email } = tokenPayload
   const { organisationsRepository, params = {} } = request
   const { organisationId } = params
-  const { defraIdOrgId } = getOrgDataFromToken(tokenPayload)
+  const defraIdRelationships = getOrgDataFromToken(tokenPayload)
+  const { defraIdOrgId, defraIdOrgName } =
+    getCurrentRelationship(defraIdRelationships) || {}
+
+  console.log('tokenPayload', tokenPayload)
 
   // No defraIdOrgId to link
   if (!defraIdOrgId) {
-    console.warn('No defraIdOrgId found in token')
+    request.logger.warn('defra-id: defraIdOrgId not found in token')
 
-    return []
+    return { scope: [] }
   }
+
+  request.server.app.organisationId = organisationId.trim()
+  request.server.app.defraIdOrgId = defraIdOrgId
+  request.server.app.defraIdOrgName = defraIdOrgName
 
   // Request is for a specific organisation
   if (organisationId) {
     const organisationById =
       await organisationsRepository.findById(organisationId)
+    const isInitial = isInitialUser(organisationById, email)
 
-    console.log('DEBUG: organisationById', organisationById)
+    if (request.route.path === organisationsLinkPath && isInitial) {
+      // Linking organisation is allowed because a known user is requesting to link it
+      request.logger.debug('defra-id: approve organisation', organisationById)
+
+      return { scope: ['user_can_link_organisation'] }
+    }
 
     // Organisation has a status allowing it to be accessed
     if ([STATUS.ACTIVE, STATUS.SUSPENDED].includes(organisationById.status)) {
       const isLinked = isLinkedUser(organisationById, defraIdOrgId)
-      const isKnown = isKnownUser(organisationById, email)
-      const isAuthorised = isLinked || isKnown
-      const shouldAddUser = isLinked && !isKnown
+      const isAuthorised = isLinked || isInitial
+      const shouldAddUser = isLinked && !isInitial
 
-      console.log('DEBUG: organisation is active or suspended', {
+      request.logger.debug('defra-id: organisation is active or suspended', {
         isAuthorised,
         shouldAddUser
       })
@@ -125,84 +144,97 @@ async function getScope(email, tokenPayload, request) {
         )
       }
 
-      return isAuthorised ? ['user'] : []
+      return {
+        scope: isAuthorised ? ['user'] : []
+      }
     }
   }
 
-  const [organisation, ...otherOrganisations] = await findOrganisationMatches(
+  const organisations = await findOrganisationMatches(
     email,
     defraIdOrgId,
     request
   )
 
-  console.log('DEBUG: organisation', {
-    organisation,
-    otherOrganisations
-  })
+  const hasUnlinkedOrganisations = organisations.unlinked.length > 0
+  const currentLinkedOrganisation = organisations.linked.find(
+    (organisation) => defraIdOrgId === organisation.defraIdOrgId
+  )
 
-  // More than one organisation matched
-  if (otherOrganisations.length > 0) {
-    console.warn('More than one organisation matched')
+  console.log(
+    'currentLinkedOrganisation',
+    !currentLinkedOrganisation ||
+      currentLinkedOrganisation.id !== organisationId,
+    organisations.all.find(({ id }) => id === organisationId)
+  )
 
-    return []
+  // Organisation is not yet approved
+  // if (
+  //   currentLinkedOrganisation &&
+  //   currentLinkedOrganisation.status !== STATUS.APPROVED
+  // ) {
+  //   request.logger.warn(
+  //     'defra-id: organisation is not yet approved and access cannot be authorised'
+  //   )
+  //
+  //   return { scope: [] }
+  // }
+
+  // Organisation requested does not match the organisations the user is associated with
+  if (!organisations.all.find(({ id }) => id === organisationId)) {
+    request.logger.warn(
+      'defra-id: user is not associated with this organisation'
+    )
+
+    return { scope: [] }
+  }
+
+  // Current Organisation in token not linked or the organisation requested does not match the current Organisation in the token
+  if (
+    !currentLinkedOrganisation ||
+    currentLinkedOrganisation.id !== organisationId
+  ) {
+    const message = 'No linked organisation found'
+    request.logger.warn(`defra-id: ${message}`)
+    console.dir({ currentLinkedOrganisation })
+    const isCurrentOrganisationLinked = !!currentLinkedOrganisation
+
+    return {
+      scope: [],
+      response: h
+        .response({
+          action: 'link-organisations',
+          defraId: {
+            userId: tokenPayload.id,
+            orgName: defraIdOrgName,
+            otherRelationships: defraIdRelationships.filter(
+              ({ isCurrent }) => !isCurrent
+            )
+          },
+          isCurrentOrganisationLinked,
+          message,
+          organisationId,
+          organisations: hasUnlinkedOrganisations
+            ? getOrganisationsSummary(organisations.unlinked)
+            : []
+        })
+        .code(StatusCodes.PARTIAL_CONTENT)
+    }
   }
 
   // Organisation requested does not match the organisation the user is associated with
-  if (organisationId && organisationId !== organisation.id) {
-    console.warn(
-      'Organisation requested does not match the organisation the user is associated with'
+  if (organisationId && organisationId !== currentLinkedOrganisation.id) {
+    request.logger.warn(
+      'defra-id: organisation requested does not match the organisation the user is associated with'
     )
+    console.dir({ currentLinkedOrganisation, organisationId })
 
-    return []
+    return { scope: [] }
   }
 
-  // Organisation is not yet approved
-  if (!organisation || organisation.status !== STATUS.APPROVED) {
-    console.warn('Organisation is not yet approved')
+  request.logger.warn('defra-id: organisation could not be matched for user')
 
-    return []
-  }
-
-  // Organisation is approved and the user is associated with it
-  if (
-    organisation.status === STATUS.APPROVED &&
-    isAuthorisedUser(organisation, { defraIdOrgId, email })
-  ) {
-    console.log('DEBUG: approve organisation', organisation)
-
-    if (!organisation.defraIdOrgId) {
-      console.log('Linking organisation to defraIdOrgId', defraIdOrgId)
-    }
-
-    await organisationsRepository.update(
-      organisation.id,
-      organisation.version,
-      {
-        status: STATUS.ACTIVE,
-        defraIdOrgId: `${defraIdOrgId}`,
-        registrations: organisation.registrations.reduce(
-          (prev, registration) =>
-            registration.status === STATUS.APPROVED
-              ? [...prev, { ...registration, status: STATUS.ACTIVE }]
-              : prev,
-          []
-        ),
-        accreditations: organisation.accreditations.reduce(
-          (prev, accreditation) =>
-            accreditation.status === STATUS.APPROVED
-              ? [...prev, { ...accreditation, status: STATUS.ACTIVE }]
-              : prev,
-          []
-        )
-      }
-    )
-
-    return ['user']
-  }
-
-  console.warn('Organisation could not be matched for user')
-
-  return []
+  return { scope: [] }
 }
 
 export function defraIdJwtOptions({ jwks_uri: jwksUri, issuer }) {
@@ -219,20 +251,36 @@ export function defraIdJwtOptions({ jwks_uri: jwksUri, issuer }) {
       maxAgeSec: 3600, // 60 minutes
       timeSkewSec: 15
     },
-    validate: async (artifacts, request) => {
+    validate: async (artifacts, request, h) => {
       const tokenPayload = artifacts.decoded.payload
 
-      console.log('DEBUG: tokenPayload', tokenPayload)
+      request.logger.debug('defra-id: tokenPayload', tokenPayload)
 
-      const credentials = {
-        id: tokenPayload.contactId,
-        email: tokenPayload.email,
-        issuer: tokenPayload.iss,
-        scope: await getScope(tokenPayload.email, tokenPayload, request)
-      }
+      const { scope, response } = await validateRequest(
+        tokenPayload,
+        request,
+        h
+      )
 
-      // @todo: should we consider returning isValid: false in some situations?
-      return { isValid: true, credentials }
+      const isValid = !!scope?.length
+
+      const credentials = isValid
+        ? {
+            id: tokenPayload.contactId,
+            email: tokenPayload.email,
+            issuer: tokenPayload.iss,
+            scope
+          }
+        : undefined
+
+      return response
+        ? {
+            response
+          }
+        : {
+            isValid,
+            credentials
+          }
     }
   }
 }
