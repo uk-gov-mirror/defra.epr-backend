@@ -67,8 +67,6 @@ export const validateOrganisationUpdate = (data) => {
 
   if (error) {
     const details = error.details.map((d) => d.message).join('; ')
-    // @fixme: remove
-    console.log('DEBUG: validateOrganisationUpdate', details)
     throw Boom.badData(`Invalid organisation data: ${details}`)
   }
 

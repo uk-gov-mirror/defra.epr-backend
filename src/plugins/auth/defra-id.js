@@ -13,13 +13,12 @@ async function findOrganisationMatches(email, defraIdOrgId, request) {
 
   try {
     unlinkedOrganisations =
-      await organisationsRepository.findAllLinkedOrganisationsByUser({
+      await organisationsRepository.findAllUnlinkedOrganisationsByUser({
         email,
         isInitialUser: true
       })
-    const linkedOrganisationId =
-      await organisationsRepository.findByDefraIdOrgId(defraIdOrgId)
-    linkedOrganisations = linkedOrganisationId ? [linkedOrganisationId] : []
+    linkedOrganisations =
+      await organisationsRepository.findAllByDefraIdOrgId(defraIdOrgId)
   } catch (error) {
     linkedOrganisations = []
     unlinkedOrganisations = []
@@ -27,11 +26,14 @@ async function findOrganisationMatches(email, defraIdOrgId, request) {
     request.logger.error(error, 'defra-id: failed to find Organisation matches')
   }
 
-  request.logger.debug('defra-id: findOrganisationMatches', {
-    unlinkedOrganisations,
-    linkedOrganisations,
-    defraIdOrgId
-  })
+  request.logger.info(
+    {
+      unlinkedOrganisations,
+      linkedOrganisations,
+      defraIdOrgId
+    },
+    'defra-id: organisation matches found'
+  )
 
   return {
     all: [...unlinkedOrganisations, ...linkedOrganisations].reduce(
@@ -61,7 +63,7 @@ function getOrgDataFromToken(tokenPayload) {
 
   return relationships.map((relationship) => {
     const [relationshipId, organisationId, organisationName] =
-      relationship?.split(':')
+      relationship.split(':')
 
     return {
       defraIdRelationshipId: relationshipId,
@@ -85,156 +87,170 @@ async function validateRequest(tokenPayload, request, h) {
   const { email } = tokenPayload
   const { organisationsRepository, params = {} } = request
   const { organisationId } = params
-  const defraIdRelationships = getOrgDataFromToken(tokenPayload)
-  const { defraIdOrgId, defraIdOrgName } =
-    getCurrentRelationship(defraIdRelationships) || {}
 
-  console.log('tokenPayload', tokenPayload)
+  try {
+    const defraIdRelationships = getOrgDataFromToken(tokenPayload)
+    const { defraIdOrgId, defraIdOrgName } =
+      getCurrentRelationship(defraIdRelationships) || {}
 
-  // No defraIdOrgId to link
-  if (!defraIdOrgId) {
-    request.logger.warn('defra-id: defraIdOrgId not found in token')
+    request.logger.info(
+      { tokenPayload, params, defraIdOrgId, defraIdOrgName },
+      'defra-id: validateRequest'
+    )
 
-    return { scope: [] }
-  }
+    // No defraIdOrgId to link
+    if (!defraIdOrgId) {
+      request.logger.warn('defra-id: defraIdOrgId not found in token')
 
-  request.server.app.organisationId = organisationId.trim()
-  request.server.app.defraIdOrgId = defraIdOrgId
-  request.server.app.defraIdOrgName = defraIdOrgName
-
-  // Request is for a specific organisation
-  if (organisationId) {
-    const organisationById =
-      await organisationsRepository.findById(organisationId)
-    const isInitial = isInitialUser(organisationById, email)
-
-    if (request.route.path === organisationsLinkPath && isInitial) {
-      // Linking organisation is allowed because a known user is requesting to link it
-      request.logger.debug('defra-id: approve organisation', organisationById)
-
-      return { scope: ['user_can_link_organisation'] }
+      return { scope: [] }
     }
 
-    // Organisation has a status allowing it to be accessed
-    if ([STATUS.ACTIVE, STATUS.SUSPENDED].includes(organisationById.status)) {
-      const isLinked = isLinkedUser(organisationById, defraIdOrgId)
-      const isAuthorised = isLinked || isInitial
-      const shouldAddUser = isLinked && !isInitial
+    request.server.app.defraIdOrgId = defraIdOrgId
+    request.server.app.defraIdOrgName = defraIdOrgName
 
-      request.logger.debug('defra-id: organisation is active or suspended', {
-        isAuthorised,
-        shouldAddUser
-      })
+    // Request is for a specific organisation
+    if (organisationId) {
+      request.logger.info({ organisationId }, 'defra-id: has organisationId')
 
-      if (shouldAddUser) {
-        await organisationsRepository.update(
-          organisationById.id,
-          organisationById.version,
-          {
-            users: [
-              ...organisationById.users,
-              {
-                email,
-                fullName: `${tokenPayload.firstName} ${tokenPayload.lastName}`,
-                isInitialUser: false,
-                roles: [ROLE.STANDARD_USER]
-              }
-            ]
-          }
-        )
+      const organisationById =
+        await organisationsRepository.findById(organisationId)
+      const isInitial = isInitialUser(organisationById, email)
+
+      if (request.route.path === organisationsLinkPath && isInitial) {
+        // Linking organisation is allowed because a known user is requesting to link it
+        request.logger.info(organisationById, 'defra-id: approve organisation')
+
+        request.server.app.organisationId = organisationId
+
+        return { scope: ['user_can_link_organisation'] }
       }
+
+      // Organisation has a status allowing it to be accessed
+      if ([STATUS.ACTIVE, STATUS.SUSPENDED].includes(organisationById.status)) {
+        const isOrgMatch = organisationById.defraIdOrgId === defraIdOrgId
+        const isLinked = isLinkedUser(organisationById, defraIdOrgId)
+        const isAuthorised = isOrgMatch && isLinked
+        const shouldAddUser = isLinked && !isInitial
+
+        request.logger.info(
+          {
+            isAuthorised,
+            shouldAddUser
+          },
+          'defra-id: organisation is active or suspended'
+        )
+
+        if (shouldAddUser) {
+          await organisationsRepository.update(
+            organisationById.id,
+            organisationById.version,
+            {
+              users: [
+                ...organisationById.users,
+                {
+                  email,
+                  fullName: `${tokenPayload.firstName} ${tokenPayload.lastName}`,
+                  isInitialUser: false,
+                  roles: [ROLE.STANDARD_USER]
+                }
+              ]
+            }
+          )
+        }
+
+        return {
+          scope: isAuthorised ? ['user'] : []
+        }
+      }
+    }
+
+    const organisations = await findOrganisationMatches(
+      email,
+      defraIdOrgId,
+      request
+    )
+
+    const hasUnlinkedOrganisations = organisations.unlinked.length > 0
+    const currentLinkedOrganisation = organisations.linked.find(
+      (organisation) => defraIdOrgId === organisation.defraIdOrgId
+    )
+
+    // Organisation requested does not match the organisations the user is associated with
+    if (
+      organisationId &&
+      !organisations.all.find(({ id }) => id === organisationId)
+    ) {
+      request.logger.warn(
+        { organisationId, organisations: organisations.all },
+        'defra-id: user is not associated with this organisation'
+      )
+
+      return { scope: [] }
+    }
+
+    // Current Organisation in token not linked or the organisation requested does not match the current Organisation in the token
+    if (
+      !currentLinkedOrganisation ||
+      (organisationId && currentLinkedOrganisation.id !== organisationId)
+    ) {
+      const message = 'No linked organisation found'
+      request.logger.warn(
+        {
+          currentLinkedOrganisation,
+          unlinkedOrganisations: organisations.unlinked
+        },
+        `defra-id: ${message}`
+      )
+      const isCurrentOrganisationLinked = !!currentLinkedOrganisation
 
       return {
-        scope: isAuthorised ? ['user'] : []
+        scope: [],
+        response: h
+          .response({
+            action: 'link-organisations',
+            defraId: {
+              userId: tokenPayload.id,
+              orgName: defraIdOrgName,
+              otherRelationships: defraIdRelationships.filter(
+                ({ isCurrent }) => !isCurrent
+              )
+            },
+            isCurrentOrganisationLinked,
+            message,
+            organisationId,
+            organisations: hasUnlinkedOrganisations
+              ? getOrganisationsSummary(organisations.unlinked)
+              : []
+          })
+          .code(StatusCodes.PARTIAL_CONTENT)
       }
     }
-  }
 
-  const organisations = await findOrganisationMatches(
-    email,
-    defraIdOrgId,
-    request
-  )
+    if (currentLinkedOrganisation) {
+      request.logger.info(
+        { currentLinkedOrganisation },
+        'defra-id: user is authorised for currentLinkedOrganisation'
+      )
 
-  const hasUnlinkedOrganisations = organisations.unlinked.length > 0
-  const currentLinkedOrganisation = organisations.linked.find(
-    (organisation) => defraIdOrgId === organisation.defraIdOrgId
-  )
-
-  console.log(
-    'currentLinkedOrganisation',
-    !currentLinkedOrganisation ||
-      currentLinkedOrganisation.id !== organisationId,
-    organisations.all.find(({ id }) => id === organisationId)
-  )
-
-  // Organisation is not yet approved
-  // if (
-  //   currentLinkedOrganisation &&
-  //   currentLinkedOrganisation.status !== STATUS.APPROVED
-  // ) {
-  //   request.logger.warn(
-  //     'defra-id: organisation is not yet approved and access cannot be authorised'
-  //   )
-  //
-  //   return { scope: [] }
-  // }
-
-  // Organisation requested does not match the organisations the user is associated with
-  if (!organisations.all.find(({ id }) => id === organisationId)) {
-    request.logger.warn(
-      'defra-id: user is not associated with this organisation'
-    )
-
-    return { scope: [] }
-  }
-
-  // Current Organisation in token not linked or the organisation requested does not match the current Organisation in the token
-  if (
-    !currentLinkedOrganisation ||
-    currentLinkedOrganisation.id !== organisationId
-  ) {
-    const message = 'No linked organisation found'
-    request.logger.warn(`defra-id: ${message}`)
-    console.dir({ currentLinkedOrganisation })
-    const isCurrentOrganisationLinked = !!currentLinkedOrganisation
-
-    return {
-      scope: [],
-      response: h
-        .response({
-          action: 'link-organisations',
-          defraId: {
-            userId: tokenPayload.id,
-            orgName: defraIdOrgName,
-            otherRelationships: defraIdRelationships.filter(
-              ({ isCurrent }) => !isCurrent
-            )
-          },
-          isCurrentOrganisationLinked,
-          message,
-          organisationId,
-          organisations: hasUnlinkedOrganisations
-            ? getOrganisationsSummary(organisations.unlinked)
-            : []
-        })
-        .code(StatusCodes.PARTIAL_CONTENT)
+      return { scope: ['user'] }
     }
-  }
 
-  // Organisation requested does not match the organisation the user is associated with
-  if (organisationId && organisationId !== currentLinkedOrganisation.id) {
-    request.logger.warn(
-      'defra-id: organisation requested does not match the organisation the user is associated with'
-    )
-    console.dir({ currentLinkedOrganisation, organisationId })
+    // Organisation requested does not match the organisation the user is associated with
+    if (organisationId && organisationId !== currentLinkedOrganisation.id) {
+      request.logger.warn(
+        { currentLinkedOrganisation, organisationId },
+        'defra-id: organisation requested does not match the organisation the user is associated with'
+      )
+
+      return { scope: [] }
+    }
+
+    request.logger.warn('defra-id: organisation could not be matched for user')
 
     return { scope: [] }
+  } catch (error) {
+    request.logger.error(error, 'defra-id: failed to validate request')
   }
-
-  request.logger.warn('defra-id: organisation could not be matched for user')
-
-  return { scope: [] }
 }
 
 export function defraIdJwtOptions({ jwks_uri: jwksUri, issuer }) {
@@ -253,8 +269,6 @@ export function defraIdJwtOptions({ jwks_uri: jwksUri, issuer }) {
     },
     validate: async (artifacts, request, h) => {
       const tokenPayload = artifacts.decoded.payload
-
-      request.logger.debug('defra-id: tokenPayload', tokenPayload)
 
       const { scope, response } = await validateRequest(
         tokenPayload,

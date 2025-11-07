@@ -15,6 +15,7 @@ import {
 import Boom from '@hapi/boom'
 import { ObjectId } from 'mongodb'
 import { generateInitialUsers } from '#domain/organisations/generate-initial-users.js'
+import { STATUS } from '#domain/organisations/status.js'
 
 const COLLECTION_NAME = 'epr-organisations'
 const MONGODB_DUPLICATE_KEY_ERROR_CODE = 11000
@@ -74,8 +75,6 @@ const performInsert = async (db, organisation) => {
 }
 
 const performUpdate = async (db, id, version, updates) => {
-  console.log('DEBUG: performUpdate', updates)
-
   const validatedId = validateId(id)
   const validatedUpdates = validateOrganisationUpdate(updates)
 
@@ -143,7 +142,7 @@ const performFindById = async (db, id) => {
   return mapDocumentWithCurrentStatuses(doc)
 }
 
-const performFindByDefraIdOrgId = async (db, defraIdOrgId) => {
+const performFindAllByDefraIdOrgId = async (db, defraIdOrgId) => {
   // validate the ID and throw early
   let validatedDefraIdOrgId
   try {
@@ -154,20 +153,24 @@ const performFindByDefraIdOrgId = async (db, defraIdOrgId) => {
     )
   }
 
-  const doc = await db
+  const docs = await db
     .collection(COLLECTION_NAME)
-    .findOne({ defraIdOrgId: validatedDefraIdOrgId })
+    .find({
+      defraIdOrgId: validatedDefraIdOrgId,
+      status: { $ne: STATUS.CREATED }
+    })
+    .toArray()
 
-  if (!doc) {
-    // throw Boom.notFound(`Organisation with id ${defraIdOrgId} not found`)
+  if (!docs.length) {
+    // throw Boom.notFound(`No organisations with provided email found`)
 
-    return null
+    return []
   }
 
-  return mapDocumentWithCurrentStatuses(doc)
+  return docs.map((doc) => mapDocumentWithCurrentStatuses(doc))
 }
 
-const performFindAllLinkedOrganisationsByUser = async (db, options) => {
+const performFindAllUnlinkedOrganisationsByUser = async (db, options) => {
   // validate the name and throw early
   let validatedUserEntries
   try {
@@ -183,7 +186,8 @@ const performFindAllLinkedOrganisationsByUser = async (db, options) => {
         (prev, [key, value]) => ({ ...prev, [`users.${key}`]: value }),
         {}
       ),
-      defraIdOrgId: { $exists: false }
+      defraIdOrgId: { $exists: false },
+      status: { $ne: STATUS.CREATED }
     })
     .toArray()
 
@@ -218,12 +222,12 @@ export const createOrganisationsRepository = (db) => () => ({
     return performFindById(db, id)
   },
 
-  async findAllLinkedOrganisationsByUser(userOptions) {
-    return performFindAllLinkedOrganisationsByUser(db, userOptions)
+  async findAllUnlinkedOrganisationsByUser(userOptions) {
+    return performFindAllUnlinkedOrganisationsByUser(db, userOptions)
   },
 
-  async findByDefraIdOrgId(defraIdOrgId) {
-    return performFindByDefraIdOrgId(db, defraIdOrgId)
+  async findAllByDefraIdOrgId(defraIdOrgId) {
+    return performFindAllByDefraIdOrgId(db, defraIdOrgId)
   },
 
   async findAll() {

@@ -1,4 +1,15 @@
-# pEPR Low Level Design Auth UI
+# pEPR Low Level Design: Auth UI
+
+This document describes the Authentication and Authorisation processes from the main public-facing UI for the pEPR RE/EX project.
+
+## Assumptions
+
+1. Defra ID is a mandated part of the solution
+2. That Defra ID supports multiple Identity Providers, a decision on which to use is not yet final but it seems likely that we will only use One Login
+3. Defra ID does not yet support the ability to verify that a user legitimately represents an Organisation, we therefore must authorise their access to data previously submitted about that Organisation
+4. That we will have an Admin UI for the purposes of:
+   1. Editing the status of Organisations, Registrations & Accreditations in our database to "approved" so that they can be accessed by authorised users
+   2. Viewing/Adding/Editing Users associated with an Organisation
 
 ```mermaid
 flowchart LR
@@ -41,7 +52,6 @@ flowchart LR
     pepr_unauthenticated[Unauthenticated]
     pepr_unauthorised[Unauthorised]
     pepr_confirmOrganisation[Confirm Organisation]
-    pepr_organisationList[Organisation List]
     pepr_organisationDashboard[Organisation Dashboard]
 
   %% Pages: End
@@ -206,43 +216,59 @@ flowchart LR
   end
 ```
 
-## Single organisation:
+## Points to note
 
-### Confirm Organisation
+1. Defra ID Organisation Name may not match a pEPR Organisation Name
+2. We ask user to "link" their Defra ID Organisation to a pEPR Organisation
+3. Users can have access to multiple Defra ID Organisations
+4. Users can have access to multiple pEPR Organisations
+5. Users fall into one of three categories:
+   1. Initial Users:
+      1. Each pEPR Organisation can have multiple Initial Users, each with a unique email address
+      2. Their name and email address was submitted during the application process or is supplied by the regulator when approving the pEPR Organisation
+      3. The regulator has had sight of this data before approving the pEPR Organisation
+      4. They receive a notification (per pEPR Organisation) to authenticate through Defra ID and access pEPR for the first time
+      5. They will subsequently be asked to confirm the "link" between their Defra ID Organisation and a pEPR Organisation they are authorised to access
+      6. They are the first authorised user(s) of the pEPR Organisation
+   2. Added User:
+      1. They may not be listed on a pEPR Organisation before it is "linked" to a Defra ID Organisation
+      2. They may be added to a Defra ID Organisation by a Defra ID Admin
+      3. They will not be authorised to access a pEPR Organisation until it has been "linked"
+      4. They will be programmatically added as a User to a pEPR Organisation on their first authorised access to that pEPR Organisation
+      5. They will not receive notifications from pEPR relating to authorisation
+   3. Unauthorised User:
+      1. They may be authenticated through Defra ID
+      2. They will not be able to access a pEPR Organisation
+      3. They may become authorised in the future if added to either:
+         1. the list of Users in a pEPR Organisation
+         2. the Defra ID Organisation with the appropriate service role of 'User'
 
-We've found a potential match for your organisation
+## Defra ID Token
 
-#### Your Organisation
-
-ABC Limited
-
-#### Organisation data in this Service
-
-Name: **ABC LTD**
-
-Org ID: **500001**
-
-System Reference Number: **6507f1f77bcf86cd79943900**
-
-[This is correct](/)
-
-[This is incorrect](/)
-
----
-
-## Multiple organisations:
-
-## Confirm Organisation
-
-We've found a list of potential matches for your organisation
-
-### Your Organisation
-
-ABC Limited
-
-### Organisation data
-
-| Org Name | OrgId  | System Reference Number  | Action    |
-| -------- | ------ | ------------------------ | --------- |
-| ABC LTD  | 500001 | 6507f1f77bcf86cd79943900 | [Link](/) |
-| ABC LTD  | 500001 | 6507f1f77bcf86cd79943900 | [Link](/) |
+```json
+{
+  "id": "76f4b3a9-6ff0-4600-ab89-dad3547992d2",
+  "sub": "76f4b3a9-6ff0-4600-ab89-dad3547992d2",
+  "iss": "http://localhost:3200/cdp-defra-id-stub",
+  "correlationId": "8401f8c4-e37b-4933-9062-5d568a99441f",
+  "sessionId": "9f38ebe4-70b1-437c-a3ec-763304eb4135",
+  "contactId": "a187f3f1-b2fe-4834-b44a-68ada6b5a1bc",
+  "serviceId": "e84a398b-8104-47a2-86ae-de1168e4132f",
+  "firstName": "Yoda",
+  "lastName": "Yoda",
+  "email": "yoda@starwars.com",
+  "uniqueReference": "7eba4775-f833-4043-87b4-9f56e03040e0",
+  "loa": "1",
+  "aal": "1",
+  "enrolmentCount": "1",
+  "enrolmentRequestCount": "1",
+  "currentRelationshipId": "1",
+  "relationships": [
+    "1:00000000-0000-0000-0000-000000000001:ACME LIMITED:0:Employee:0",
+    "2:00000000-0000-0000-0000-000000000002:Plastic Exporters:0:Employee:0",
+    "3:00000000-0000-0000-0000-000000000003:Green Future:0:Employee:0"
+  ],
+  "roles": [],
+  "iat": 1762525564
+}
+```

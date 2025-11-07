@@ -1,3 +1,4 @@
 export { organisationsGetAll } from './get.js'
 export { organisationsGetById } from './get-by-id.js'
+export { organisationsGetAllByDefraIdOrgId } from './get-all-by-defraIdOrgId.js'
 export { organisationsLink } from './link.js'

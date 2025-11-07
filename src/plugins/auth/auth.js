@@ -24,8 +24,6 @@ export const auth = {
 
       server.auth.scheme('delegating', delegatingAuthScheme)
 
-      console.log('DEBUG: defraIdWellKnownDetails', defraIdWellKnownDetails)
-
       server.auth.strategy('access-token', 'delegating', {
         candidateStrategies: [
           {
