@@ -149,7 +149,7 @@ describe('extractRepeaters', () => {
   })
 
   it('should extract PRN signatory details from accreditation form', () => {
-    const prnSignatory = FORM_PAGES.REPROCESSOR_ACCREDITATION.PRN_SIGNATORY
+    const prnSignatory = FORM_PAGES.ACCREDITATION.PRN_SIGNATORY
 
     const result = extractRepeaters(
       reprocessorWood.rawSubmissionData,
@@ -176,9 +176,9 @@ describe('extractRepeaters', () => {
 describe('extractAnswers', () => {
   it('should extract answers in nested structure by page', () => {
     const result = extractAnswers(exporterRegistration.rawSubmissionData)
-    const orgDetails = FORM_PAGES.REPROCESSOR_REGISTRATION.ORGANISATION_DETAILS
+    const orgDetails = FORM_PAGES.REGISTRATION.ORGANISATION_DETAILS
 
-    const haveOrgId = FORM_PAGES.REPROCESSOR_REGISTRATION.HAVE_ORGANISATION_ID
+    const haveOrgId = FORM_PAGES.REGISTRATION.HAVE_ORGANISATION_ID
     expect(result[haveOrgId.title]).toBeDefined()
     expect(result[haveOrgId.title][haveOrgId.fields.HAVE_ORG_ID]).toBe('true')
 
@@ -206,10 +206,8 @@ describe('extractAnswers', () => {
 
   it('should handle duplicate field names across different pages', () => {
     const result = extractAnswers(reprocessorAllMaterials.rawSubmissionData)
-    const envPermit =
-      FORM_PAGES.REPROCESSOR_REGISTRATION.ALUMINIUM_ENVIRONMENTAL_PERMIT
-    const siteCapacity =
-      FORM_PAGES.REPROCESSOR_REGISTRATION.ALUMINIUM_SITE_CAPACITY
+    const envPermit = FORM_PAGES.REGISTRATION.ALUMINIUM_ENVIRONMENTAL_PERMIT
+    const siteCapacity = FORM_PAGES.REGISTRATION.ALUMINIUM_SITE_CAPACITY
 
     expect(result[envPermit.title]).toBeDefined()
     expect(result[envPermit.title][envPermit.fields.TIMESCALE]).toBe('Yearly')
@@ -488,7 +486,7 @@ describe('flattenAnswersByShortDesc', () => {
     const answers = extractAnswers(exporterRegistration.rawSubmissionData)
     const flattened = flattenAnswersByShortDesc(answers)
 
-    const orgDetails = FORM_PAGES.REPROCESSOR_REGISTRATION.ORGANISATION_DETAILS
+    const orgDetails = FORM_PAGES.REGISTRATION.ORGANISATION_DETAILS
     expect(flattened[orgDetails.fields.ORG_NAME]).toBe('EuroPack GmbH')
     expect(flattened[orgDetails.fields.ORGANISATION_ID]).toBe('503181')
   })

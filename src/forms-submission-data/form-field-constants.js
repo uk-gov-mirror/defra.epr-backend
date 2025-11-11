@@ -80,7 +80,7 @@ export const FORM_PAGES = {
       }
     }
   },
-  REPROCESSOR_ACCREDITATION: {
+  ACCREDITATION: {
     PRN_SIGNATORY: {
       title: 'Authority to issue PRNs for this packaging waste category',
       fields: {
@@ -91,7 +91,7 @@ export const FORM_PAGES = {
       }
     }
   },
-  REPROCESSOR_REGISTRATION: {
+  REGISTRATION: {
     HAVE_ORGANISATION_ID: {
       title: 'Do you have an Organisation ID number?',
       fields: {
@@ -124,6 +124,27 @@ export const FORM_PAGES = {
       fields: {
         TIMESCALE: TIMESCALE_ALUMINIUM
       }
-    }
+    },
+    SUBMITTER_DETAILS: {
+      fields: {
+        NAME: 'App contact name',
+        EMAIL: 'App contact email address',
+        TELEPHONE_NUMBER: 'App contact telephone number',
+        JOB_TITLE: 'App contact job title'
+      }
+    },
+    SITE_DETAILS: {
+      fields: {
+        SITE_ADDRESS: 'Reprocessing site address',
+        GRID_REFERENCE: 'Grid reference',
+        NOTICE_ADDRESS: 'Address to serve notices'
+      }
+    },
+    WASTE_REGISTRATION_NUMBER: 'Carrier, broker or dealer number',
+    MATERIAL_REGISTERED: 'Packaging waste category to be registered',
+    GLASS_RECYCLING_PROCESS: 'Glass process',
+    SUPPLIERS: 'Suppliers',
+    EXPORT_PORTS: 'Port name',
+    PLANT_EQUIMENT_DETAILS: 'Plant and equipment'
   }
 }
