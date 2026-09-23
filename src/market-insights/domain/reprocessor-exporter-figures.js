@@ -7,6 +7,7 @@ import {
   toNumber
 } from '#common/helpers/decimal-utils.js'
 import { WASTE_PROCESSING_TYPE } from '#domain/organisations/model.js'
+import { recordOf } from '#common/helpers/record-of.js'
 
 /**
  * @typedef {import('#domain/organisations/model.js').WasteProcessingTypeValue} WasteProcessingTypeValue
@@ -67,6 +68,27 @@ import { WASTE_PROCESSING_TYPE } from '#domain/organisations/model.js'
  * published workbook prints a dash there in every table and month.
  *
  * @typedef {Measures & { tonnageSentOnTotal: number }} PublishedTotal
+ */
+
+/**
+ * How many separate operators could have contributed to a row of figures or a
+ * grand total, how many of them it includes a report from, and how many of
+ * those put something into each of its figures.
+ *
+ * @template {string} F - the figures it serves
+ * @typedef {{
+ *   operatorCount: number,
+ *   submittingOperatorCount: number,
+ *   contributingOperatorCounts: Record<F, number>
+ * }} OperatorCounts
+ */
+
+/**
+ * Figures with their operator counts, taken apart for each accreditation
+ * type's measures so each carries a count for every figure its table prints.
+ *
+ * @template T
+ * @typedef {T extends unknown ? T & OperatorCounts<keyof T & string> : never} WithOperatorCounts
  */
 
 /**
@@ -187,6 +209,16 @@ export const averagePricePerTonne = (totalRevenue, revisedTonnageIssued) =>
       )
     : 0
 
+/** @type {(keyof SharedMeasures)[]} */
+const SENT_ON_SPLITS = [
+  'tonnageSentOnToReprocessor',
+  'tonnageSentOnToExporter',
+  'tonnageSentOnToOtherFacilities'
+]
+
+/** @type {(keyof SharedMeasures)[]} */
+const AVERAGE_PRICE_INPUTS = ['totalRevenue', 'revisedTonnageIssued']
+
 /**
  * @template {Measures} T
  * @param {T} measures
@@ -195,11 +227,10 @@ export const averagePricePerTonne = (totalRevenue, revisedTonnageIssued) =>
 export const withSentOnTotal = (measures) => ({
   ...measures,
   tonnageSentOnTotal: toNumber(
-    [
-      measures.tonnageSentOnToReprocessor,
-      measures.tonnageSentOnToExporter,
-      measures.tonnageSentOnToOtherFacilities
-    ].reduce((sum, split) => addRounded(sum, split, 2), toDecimal(0))
+    SENT_ON_SPLITS.map((split) => measures[split]).reduce(
+      (sum, split) => addRounded(sum, split, 2),
+      toDecimal(0)
+    )
   )
 })
 
@@ -216,14 +247,6 @@ export const withPublishedFigures = (measures) => ({
   )
 })
 
-const SENT_ON_SPLITS = [
-  'tonnageSentOnToReprocessor',
-  'tonnageSentOnToExporter',
-  'tonnageSentOnToOtherFacilities'
-]
-
-const AVERAGE_PRICE_INPUTS = ['totalRevenue', 'revisedTonnageIssued']
-
 /**
  * The published figures one report's measures put something into. A measure
  * reported as zero puts nothing in, so where one operator reports a figure and
@@ -236,14 +259,39 @@ const AVERAGE_PRICE_INPUTS = ['totalRevenue', 'revisedTonnageIssued']
  * @returns {string[]}
  */
 export const figuresContributedTo = (measures) => {
-  const contributed = Object.entries(measures)
-    .filter(([, value]) => value !== 0)
-    .map(([measure]) => measure)
-  /** @param {string[]} inputs */
-  const anyOf = (inputs) => inputs.some((input) => contributed.includes(input))
+  /** @param {(keyof SharedMeasures)[]} inputs */
+  const anyOf = (inputs) => inputs.some((input) => measures[input] !== 0)
   return [
-    ...contributed,
+    ...Object.entries(measures)
+      .filter(([, value]) => value !== 0)
+      .map(([measure]) => measure),
     ...(anyOf(SENT_ON_SPLITS) ? ['tonnageSentOnTotal'] : []),
     ...(anyOf(AVERAGE_PRICE_INPUTS) ? ['averagePricePerTonne'] : [])
   ]
 }
+
+/**
+ * @template {Record<string, number>} T
+ * @param {T} figures
+ * @param {{
+ *   operatorCount: number,
+ *   submittingOperatorCount: number,
+ *   contributingOperatorCountOf: (figure: string) => number
+ * }} counts
+ * @returns {WithOperatorCounts<T>}
+ */
+export const withOperatorCounts = (
+  figures,
+  { operatorCount, submittingOperatorCount, contributingOperatorCountOf }
+) =>
+  // tsc cannot resolve the conditional type against a generic T. The counts
+  // are keyed by the figures' own keys, which is what it says.
+  /** @type {WithOperatorCounts<T>} */ ({
+    ...figures,
+    operatorCount,
+    submittingOperatorCount,
+    contributingOperatorCounts: recordOf(
+      Object.keys(figures),
+      contributingOperatorCountOf
+    )
+  })

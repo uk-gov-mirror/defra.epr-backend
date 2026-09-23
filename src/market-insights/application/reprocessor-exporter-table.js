@@ -18,6 +18,7 @@ import {
   figuresContributedTo,
   measuresOf,
   noMeasures,
+  withOperatorCounts,
   withPublishedFigures,
   withSentOnTotal
 } from '#market-insights/domain/reprocessor-exporter-figures.js'
@@ -41,6 +42,14 @@ import { recordOf } from '#common/helpers/record-of.js'
  * @typedef {import('#market-insights/domain/reprocessor-exporter-figures.js').Measures} Measures
  * @typedef {import('#market-insights/domain/reprocessor-exporter-figures.js').PublishedFigures} PublishedFigures
  * @typedef {import('#market-insights/domain/reprocessor-exporter-figures.js').PublishedTotal} PublishedTotal
+ */
+
+/**
+ * @template T
+ * @typedef {import('#market-insights/domain/reprocessor-exporter-figures.js').WithOperatorCounts<T>} WithOperatorCounts
+ */
+
+/**
  * @typedef {import('#market-insights/application/monthly-reports.js').CoversRegistration} CoversRegistration
  * @typedef {import('#market-insights/application/monthly-reports.js').ReportCount} ReportCount
  * @typedef {import('#market-insights/application/monthly-reports.js').OwedReport} OwedReport
@@ -59,19 +68,6 @@ import { recordOf } from '#common/helpers/record-of.js'
  */
 
 /**
- * How many separate operators could have contributed to a cell or grand total,
- * how many of them it includes a report from, and how many of those put
- * something into each of its figures.
- *
- * @template {string} F - the figures it serves
- * @typedef {{
- *   operatorCount: number,
- *   submittingOperatorCount: number,
- *   contributingOperatorCounts: Record<F, number>
- * }} OperatorCounts
- */
-
-/**
  * The operators behind every figure, each keyed as the figure's cell or grand
  * total is, and for those contributing, the figure within it too.
  *
@@ -82,9 +78,9 @@ import { recordOf } from '#common/helpers/record-of.js'
  */
 
 /**
- * @typedef {Record<WasteProcessingTypeValue, PublishedFigures & OperatorCounts<keyof PublishedFigures>>} FiguresByAccreditationType
+ * @typedef {Record<WasteProcessingTypeValue, WithOperatorCounts<PublishedFigures>>} FiguresByAccreditationType
  * @typedef {Record<Material, FiguresByAccreditationType>} FiguresByMaterial
- * @typedef {Record<WasteProcessingTypeValue, PublishedTotal & OperatorCounts<keyof PublishedTotal>>} TotalsByAccreditationType
+ * @typedef {Record<WasteProcessingTypeValue, WithOperatorCounts<PublishedTotal>>} TotalsByAccreditationType
  */
 
 /**
@@ -247,24 +243,22 @@ const operatorsByFigure = (includedReports) =>
 
 /**
  * @template {Record<string, number>} T
- * @param {T} figures
+ * @param {T} figures - a cell's or grand total's
  * @param {OperatorsByCell} operators
- * @param {string} key
- * @returns {T & OperatorCounts<keyof T & string>}
+ * @param {string} key - the cell's or grand total's
+ * @returns {WithOperatorCounts<T>}
  */
-const withOperatorCounts = (
+const withOperatorsBehind = (
   figures,
   { possible, submitting, contributing },
   key
-) => ({
-  ...figures,
-  operatorCount: possible.get(key)?.size ?? 0,
-  submittingOperatorCount: submitting.get(key)?.size ?? 0,
-  contributingOperatorCounts: recordOf(
-    /** @type {(keyof T & string)[]} */ (Object.keys(figures)),
-    (figure) => contributing.get(figureKey(key, figure))?.size ?? 0
-  )
-})
+) =>
+  withOperatorCounts(figures, {
+    operatorCount: possible.get(key)?.size ?? 0,
+    submittingOperatorCount: submitting.get(key)?.size ?? 0,
+    contributingOperatorCountOf: (figure) =>
+      contributing.get(figureKey(key, figure))?.size ?? 0
+  })
 
 /**
  * The publication prints every material and both accreditation types for
@@ -280,7 +274,7 @@ const withOperatorCounts = (
 const publishedFigures = (cells, operators, month) =>
   recordOf(TONNAGE_MONITORING_MATERIALS, (material) =>
     recordOf(Object.values(WASTE_PROCESSING_TYPE), (accreditationType) =>
-      withOperatorCounts(
+      withOperatorsBehind(
         withPublishedFigures(
           measuresFor(cells, material, accreditationType, month)
         ),
@@ -301,7 +295,7 @@ const publishedFigures = (cells, operators, month) =>
  */
 const publishedTotals = (cells, operators, month) =>
   recordOf(Object.values(WASTE_PROCESSING_TYPE), (accreditationType) =>
-    withOperatorCounts(
+    withOperatorsBehind(
       withSentOnTotal(
         TONNAGE_MONITORING_MATERIALS.reduce(
           (total, material) =>
